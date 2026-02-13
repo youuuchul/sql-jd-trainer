@@ -11,8 +11,25 @@ import {
   Layout,
   MessageSquare,
   Loader2,
-  Table as TableIcon
+  Table as TableIcon,
+  LinkIcon,
+  FileDown
 } from 'lucide-react';
+
+// Lazy PDF.js loader (browser-only, uses CDN to avoid bundling)
+const loadPdfJs = async () => {
+  if (window.__pdfjs) return window.__pdfjs;
+  // Use ESM build from CDN
+  const pdfjs = await import('https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs');
+  // Worker via CDN as well
+  pdfjs.GlobalWorkerOptions.workerSrc =
+    'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs';
+  window.__pdfjs = pdfjs;
+  return pdfjs;
+};
+
+const STORAGE_KEY = 'sqlJdSessions';
+const SESSION_LIMIT = 20;
 
 /**
  * SQL-JD-Trainer
@@ -25,9 +42,13 @@ import {
 // --- Constants & Prompts ---
 
 const SYSTEM_PROMPT_ANALYSIS = `
-You are a Senior Data Engineer & Technical Interviewer at a top-tier tech company.
+You are a Senior Data Engineer & Technical Interviewer.
 Analyze the provided Job Description (JD) and extract key SQL skills.
 Based on the domain (e.g., E-commerce, Fintech, AdTech), generate a relevant database schema and 3 progressive SQL problems.
+
+Language rules:
+- Problem title/description/hint MUST be in Korean.
+- Schema/table/column names stay in English.
 
 Output MUST be valid JSON with this structure:
 {
@@ -47,10 +68,10 @@ Output MUST be valid JSON with this structure:
     {
       "id": 1,
       "difficulty": "Junior/Middle/Senior",
-      "title": "string",
-      "description": "string",
-      "expectedLogic": "string (briefly explain the SQL logic needed, e.g., JOIN, GROUP BY)",
-      "hint": "string"
+      "title": "Korean string",
+      "description": "Korean string",
+      "expectedLogic": "Korean string (필요한 SQL 로직 요약, 예: JOIN, GROUP BY)",
+      "hint": "Korean string"
     }
   ]
 }
@@ -60,13 +81,74 @@ Ensure problems match the JD's requirements (e.g., if JD mentions 'Window Functi
 `;
 
 const SYSTEM_PROMPT_FEEDBACK = `
-You are a kind and precise SQL Tutor. 
-Review the user's query against the problem description and the schema.
-The user just ran this query.
-Provide brief, constructive feedback. 
-If there's an error, explain it simply. 
-If it works but can be optimized (e.g., using CTE instead of subquery), suggest it.
+당신은 친절하고 정확한 SQL 튜터입니다.
+사용자의 SQL 쿼리를 문제 설명과 스키마 기준으로 검토하세요.
+간결하고 건설적인 피드백을 한국어로 제공합니다.
+- 오류가 있으면 무엇이 잘못되었는지 쉽게 설명합니다.
+- 정답이라도 더 나은 작성법(CTE, 윈도우 함수 최적화 등)이 있으면 제안합니다.
+JSON 형식으로 답하세요: { "feedback": "문장", "isCorrect": true/false }.
 `;
+
+const getSafeId = () => (crypto?.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`);
+
+// Offline mock for demo / fallback
+const MOCK_ANALYSIS = {
+  domain: "E-commerce",
+  keywords: ["JOIN", "GROUP BY", "Window Functions", "Cohort"],
+  schema: [
+    {
+      tableName: "customers",
+      columns: ["customer_id", "country", "signup_date"],
+      data: [
+        { customer_id: 1, country: "US", signup_date: "2024-01-05" },
+        { customer_id: 2, country: "KR", signup_date: "2024-02-10" },
+        { customer_id: 3, country: "US", signup_date: "2024-02-18" },
+        { customer_id: 4, country: "JP", signup_date: "2024-03-01" },
+        { customer_id: 5, country: "KR", signup_date: "2024-03-15" },
+      ],
+    },
+    {
+      tableName: "orders",
+      columns: ["order_id", "customer_id", "order_date", "amount"],
+      data: [
+        { order_id: 101, customer_id: 1, order_date: "2024-03-02", amount: 120 },
+        { order_id: 102, customer_id: 2, order_date: "2024-03-05", amount: 80 },
+        { order_id: 103, customer_id: 3, order_date: "2024-03-08", amount: 200 },
+        { order_id: 104, customer_id: 1, order_date: "2024-03-10", amount: 60 },
+        { order_id: 105, customer_id: 4, order_date: "2024-03-12", amount: 150 },
+        { order_id: 106, customer_id: 5, order_date: "2024-03-15", amount: 90 },
+        { order_id: 107, customer_id: 2, order_date: "2024-03-20", amount: 300 },
+        { order_id: 108, customer_id: 3, order_date: "2024-03-22", amount: 50 },
+      ],
+    },
+  ],
+  problems: [
+    {
+      id: 1,
+      difficulty: "Junior",
+      title: "국가별 주문 건수 집계",
+      description: "고객 국가별로 주문 수를 집계하고 건수 기준 내림차순으로 정렬하세요.",
+      expectedLogic: "JOIN + GROUP BY + ORDER BY",
+      hint: "customers.country 를 GROUP BY 하고 COUNT(*)",
+    },
+    {
+      id: 2,
+      difficulty: "Middle",
+      title: "월별 매출 및 신규 고객 여부",
+      description: "주문을 월 단위로 묶어 총 매출을 계산하고, 해당 월에 가입한 신규 고객 수를 함께 표시하세요.",
+      expectedLogic: "DATE_TRUNC, GROUP BY, conditional COUNT",
+      hint: "signup_date와 order_date를 같은 월로 묶어 JOIN",
+    },
+    {
+      id: 3,
+      difficulty: "Senior",
+      title: "고객별 누적 매출 랭킹",
+      description: "고객별 총매출을 계산하고, 윈도우 함수를 사용해 매출 순위를 매기세요.",
+      expectedLogic: "SUM + WINDOW (RANK/DENSE_RANK)",
+      hint: "SUM(amount) OVER(PARTITION BY customer_id) 후 랭크",
+    },
+  ],
+};
 
 // --- Components ---
 
@@ -74,7 +156,7 @@ const LoadingOverlay = ({ message }) => (
   <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
     <div className="bg-white dark:bg-slate-800 p-8 rounded-xl shadow-2xl flex flex-col items-center max-w-sm text-center">
       <Loader2 className="w-12 h-12 text-blue-600 animate-spin mb-4" />
-      <h3 className="text-xl font-bold text-slate-800 dark:text-white mb-2">Processing</h3>
+      <h3 className="text-xl font-bold text-slate-800 dark:text-white mb-2">처리 중</h3>
       <p className="text-slate-500 dark:text-slate-400">{message}</p>
     </div>
   </div>
@@ -82,7 +164,7 @@ const LoadingOverlay = ({ message }) => (
 
 const SchemaViewer = ({ schema }) => (
   <div className="space-y-4">
-    <h3 className="text-sm font-bold uppercase tracking-wider text-slate-500 mb-2">Database Schema</h3>
+    <h3 className="text-sm font-bold uppercase tracking-wider text-slate-500 mb-2">데이터베이스 스키마</h3>
     {schema.map((table) => (
       <div key={table.tableName} className="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
         <div className="bg-slate-50 dark:bg-slate-800 px-3 py-2 border-b border-slate-200 dark:border-slate-700 flex items-center gap-2">
@@ -117,7 +199,7 @@ const ResultTable = ({ data, error }) => {
     return (
       <div className="h-full flex flex-col items-center justify-center text-slate-400 italic">
         <TableIcon className="w-12 h-12 mb-2 opacity-20" />
-        No results to display. Run a query to see data.
+        표시할 결과가 없습니다. 쿼리를 실행해보세요.
       </div>
     );
   }
@@ -158,8 +240,25 @@ export default function App() {
   // State
   const [view, setView] = useState('setup'); // 'setup' | 'workspace'
   const [jdText, setJdText] = useState('');
+  const [inputMode, setInputMode] = useState('text'); // 'text' | 'url'
+  const [urlInput, setUrlInput] = useState('');
+  const [urlStatus, setUrlStatus] = useState({ loading: false, error: '' });
+  const [pdfStatus, setPdfStatus] = useState({ loading: false, error: '' });
+  const [sourceLabel, setSourceLabel] = useState('수동 입력');
+  const [sessions, setSessions] = useState([]);
+  const [sessionFilter, setSessionFilter] = useState('');
   const [loading, setLoading] = useState(false);
   const [loadingMsg, setLoadingMsg] = useState('');
+  const [apiStats, setApiStats] = useState({
+    calls: 0,
+    lastModel: 'gemini-2.5-flash-preview-09-2025',
+    keyPresent: !!import.meta.env.VITE_GEMINI_API_KEY
+  });
+
+  const toKoreanDifficulty = (value) => {
+    const map = { Junior: '주니어', Middle: '미들', Senior: '시니어' };
+    return map[value] || value;
+  };
 
   // Data State
   const [analysis, setAnalysis] = useState(null); // { domain, keywords, schema, problems }
@@ -172,6 +271,7 @@ export default function App() {
 
   // References
   const alasqlRef = useRef(null);
+  const pdfInputRef = useRef(null);
 
   // Initialize AlaSQL
   useEffect(() => {
@@ -199,10 +299,31 @@ export default function App() {
     initSqlEngine();
   }, []);
 
+  // Load saved sessions from localStorage on mount
+  useEffect(() => {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      try {
+        setSessions(JSON.parse(raw));
+      } catch (e) {
+        console.error('Failed to parse saved sessions', e);
+      }
+    }
+  }, []);
+
   // Gemini API Caller
   const callGemini = async (prompt, systemInstruction = "") => {
     try {
-      const apiKey = ""; // Injected by environment
+      const apiKey = import.meta.env.VITE_GEMINI_API_KEY || "";
+      if (!apiKey) {
+        throw new Error("Gemini API 키가 없습니다. .env.local 파일에 VITE_GEMINI_API_KEY를 설정하세요.");
+      }
+      setApiStats((prev) => ({
+        ...prev,
+        calls: prev.calls + 1,
+        lastModel: 'gemini-2.5-flash-preview-09-2025',
+        keyPresent: true,
+      }));
       const response = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`,
         {
@@ -216,7 +337,7 @@ export default function App() {
         }
       );
 
-      if (!response.ok) throw new Error("API call failed");
+      if (!response.ok) throw new Error("Gemini API 호출이 실패했습니다");
 
       const data = await response.json();
       const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
@@ -227,59 +348,176 @@ export default function App() {
     }
   };
 
+  const extractTextFromPdf = async (file) => {
+    const pdfjs = await loadPdfJs();
+    const buffer = await file.arrayBuffer();
+    const pdf = await pdfjs.getDocument({ data: buffer }).promise;
+    let text = '';
+    for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+      const page = await pdf.getPage(pageNum);
+      const content = await page.getTextContent();
+      text += content.items.map((i) => i.str).join(' ') + '\n';
+    }
+    return text;
+  };
+
+  const handlePdfUpload = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setPdfStatus({ loading: true, error: '' });
+    try {
+      const text = await extractTextFromPdf(file);
+      if (!text.trim()) throw new Error('PDF에서 텍스트를 찾지 못했습니다');
+      setJdText(text.trim());
+      setInputMode('text');
+      setSourceLabel(`PDF · ${file.name}`);
+    } catch (err) {
+      setPdfStatus({ loading: false, error: err.message || 'PDF 추출 실패' });
+      return;
+    }
+    setPdfStatus({ loading: false, error: '' });
+  };
+
+  const persistSessions = (list) => {
+    setSessions(list);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+  };
+
+  const saveSession = (payload) => {
+    const newList = [payload, ...sessions].slice(0, SESSION_LIMIT);
+    persistSessions(newList);
+  };
+
+  const buildDatabaseFromAnalysis = (result) => {
+    if (!alasqlRef.current) throw new Error("SQL Engine not loaded yet. Please refresh.");
+
+    alasqlRef.current('CREATE DATABASE IF NOT EXISTS sql_trainer; USE sql_trainer;');
+    result.schema.forEach(table => {
+      alasqlRef.current(`DROP TABLE IF EXISTS ${table.tableName}`);
+      const colDefs = table.columns.map(c => `${c} STRING`).join(', ');
+      alasqlRef.current(`CREATE TABLE ${table.tableName} (${colDefs})`);
+      if (table.data && table.data.length > 0) {
+        alasqlRef.current(`SELECT * INTO ${table.tableName} FROM ?`, [table.data]);
+      }
+    });
+    setDbReady(true);
+    setCurrentProblemIdx(0);
+    setQueryResult(null);
+    setQueryError(null);
+    setAiFeedback(null);
+    if (result.schema.length > 0) {
+      setUserQuery(`SELECT * FROM ${result.schema[0].tableName} LIMIT 5;`);
+    }
+  };
+
   const handleAnalyzeJD = async () => {
     if (!jdText.trim()) return;
 
     setLoading(true);
-    setLoadingMsg("Analyzing Job Description & Extracting Keywords...");
+    setLoadingMsg("JD를 분석하고 키워드를 추출하는 중...");
 
     try {
       // 1. Analyze JD & Generate Schema/Problems
-      const result = await callGemini(jdText, SYSTEM_PROMPT_ANALYSIS);
+      let result;
+      let usedMock = false;
+      try {
+        result = await callGemini(jdText, SYSTEM_PROMPT_ANALYSIS);
+      } catch (apiErr) {
+        console.warn("Gemini failed, falling back to mock dataset", apiErr);
+        setApiStats((prev) => ({
+          ...prev,
+          keyPresent: !!import.meta.env.VITE_GEMINI_API_KEY,
+        }));
+        usedMock = true;
+        result = MOCK_ANALYSIS;
+        setApiStats((prev) => ({ ...prev, lastModel: 'offline-mock' }));
+      }
       setAnalysis(result);
 
       // 2. Initialize In-Memory DB
-      setLoadingMsg(`Building Virtual ${result.domain || 'Database'} Environment...`);
+      setLoadingMsg(`가상 ${result.domain || 'Database'} 환경을 준비하는 중...`);
 
-      if (alasqlRef.current) {
-        // Clear existing database
-        alasqlRef.current('CREATE DATABASE IF NOT EXISTS sql_trainer; USE sql_trainer;');
+      buildDatabaseFromAnalysis(result);
+      setView('workspace');
 
-        // Create Tables & Insert Data
-        result.schema.forEach(table => {
-          // Flatten columns for CREATE TABLE
-          // Simplified: AlaSQL is flexible, we can just insert JSON objects directly into a table
-          // But creating table structure is better for strict mode
-
-          // Drop if exists
-          alasqlRef.current(`DROP TABLE IF EXISTS ${table.tableName}`);
-
-          // Create Table
-          // We define columns loosely as strings for this demo
-          const colDefs = table.columns.map(c => `${c} STRING`).join(', ');
-          alasqlRef.current(`CREATE TABLE ${table.tableName} (${colDefs})`);
-
-          // Insert Data
-          if (table.data && table.data.length > 0) {
-            alasqlRef.current(`SELECT * INTO ${table.tableName} FROM ?`, [table.data]);
-          }
-        });
-
-        setDbReady(true);
-        setView('workspace');
-        // Set initial query to a simple select on the first table
-        if (result.schema.length > 0) {
-          setUserQuery(`SELECT * FROM ${result.schema[0].tableName} LIMIT 5;`);
-        }
-      } else {
-        throw new Error("SQL Engine not loaded yet. Please refresh.");
-      }
-
+      saveSession({
+        id: getSafeId(),
+        createdAt: Date.now(),
+        jdText,
+        analysis: result,
+        sourceLabel: usedMock ? `${sourceLabel} · (mock)` : sourceLabel,
+      });
     } catch (err) {
-      alert("Failed to analyze JD. Please try again. " + err.message);
+      // Last-resort fallback: if analysis is missing, load mock and keep user in workspace
+      if (!analysis) {
+        try {
+          buildDatabaseFromAnalysis(MOCK_ANALYSIS);
+          setAnalysis(MOCK_ANALYSIS);
+          setView('workspace');
+          saveSession({
+            id: getSafeId(),
+            createdAt: Date.now(),
+            jdText: '(offline mock)',
+            analysis: MOCK_ANALYSIS,
+            sourceLabel: 'offline mock',
+          });
+          alert("네트워크 없이도 샘플 세션으로 시작합니다.");
+          return;
+        } catch (fallbackErr) {
+          alert("JD 분석에 실패했습니다. 다시 시도해주세요. " + fallbackErr.message);
+          return;
+        }
+      }
+      alert("JD 분석에 실패했습니다. 다시 시도해주세요. " + err.message);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleLoadSession = (session) => {
+    try {
+      setAnalysis(session.analysis);
+      setJdText(session.jdText);
+      setSourceLabel(session.sourceLabel || '저장된 세션');
+      buildDatabaseFromAnalysis(session.analysis);
+      setView('workspace');
+    } catch (err) {
+      alert('세션을 불러오지 못했습니다: ' + err.message);
+    }
+  };
+
+  // Load JD text from a URL (basic fetch + HTML to text)
+  const handleFetchFromUrl = async () => {
+    if (!urlInput.trim()) return;
+    setUrlStatus({ loading: true, error: '' });
+
+    try {
+      const res = await fetch(urlInput.trim());
+      if (!res.ok) throw new Error(`Failed to load (status ${res.status})`);
+      const html = await res.text();
+
+      // Strip scripts/styles and return visible text
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, 'text/html');
+      doc.querySelectorAll('script, style, noscript').forEach((el) => el.remove());
+      const text = doc.body?.innerText || '';
+
+      if (!text.trim()) throw new Error('페이지에서 텍스트를 찾지 못했습니다');
+
+      setJdText(text.trim());
+      setInputMode('text');
+      try {
+        const { hostname } = new URL(urlInput.trim());
+        setSourceLabel(`URL · ${hostname}`);
+      } catch {
+        setSourceLabel('URL 입력');
+      }
+    } catch (err) {
+      setUrlStatus({ loading: false, error: err.message || '불러오기 실패' });
+      return;
+    }
+
+    setUrlStatus({ loading: false, error: '' });
   };
 
   const runQuery = () => {
@@ -307,7 +545,7 @@ export default function App() {
 
   const askAiFeedback = async () => {
     setLoading(true);
-    setLoadingMsg("AI Tutor is reviewing your code...");
+    setLoadingMsg("AI가 쿼리를 검토하는 중...");
     try {
       const problem = analysis.problems[currentProblemIdx];
       const context = {
@@ -323,7 +561,7 @@ export default function App() {
       // For simplicity, we ask for JSON with a 'feedback' field.
 
       const feedbackResponse = await callGemini(
-        `Review this user SQL query attempt. Return JSON: { "feedback": "your string here", "isCorrect": boolean } \n Context: ${prompt}`,
+        `다음은 사용자의 SQL 풀이입니다. JSON으로만 답하세요: { "feedback": "한국어 피드백", "isCorrect": true/false }\n컨텍스트: ${prompt}`,
         SYSTEM_PROMPT_FEEDBACK
       );
 
@@ -331,7 +569,7 @@ export default function App() {
 
     } catch (e) {
       console.error(e);
-      setAiFeedback({ feedback: "Could not retrieve feedback at this time.", isCorrect: false });
+      setAiFeedback({ feedback: "지금은 피드백을 가져오지 못했습니다.", isCorrect: false });
     } finally {
       setLoading(false);
     }
@@ -341,7 +579,7 @@ export default function App() {
 
   const renderSetup = () => (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex flex-col items-center justify-center p-6">
-      <div className="max-w-3xl w-full space-y-8">
+      <div className="max-w-5xl w-full space-y-8">
         <div className="text-center space-y-4">
           <div className="flex justify-center">
             <div className="bg-blue-600 p-4 rounded-2xl shadow-lg">
@@ -352,28 +590,124 @@ export default function App() {
             SQL JD Trainer
           </h1>
           <p className="text-lg text-slate-600 dark:text-slate-400 max-w-2xl mx-auto">
-            Paste a Job Description. Our AI will extract the required SQL skills, generate a mock database, and interview you with real-world problems.
+            JD를 붙여 넣으면 필요한 SQL 스킬을 추출하고, 가상 DB와 맞춤형 문제를 만들어 바로 연습할 수 있어요.
           </p>
+          <div className="flex justify-center">
+            <div className="text-[11px] bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-full text-slate-500">
+              모델: {apiStats.lastModel} · 키: {apiStats.keyPresent ? '설정됨' : '없음'} · 호출: {apiStats.calls}회
+            </div>
+          </div>
         </div>
 
         <div className="bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700">
-          <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">
-            Paste Job Description (JD)
-          </label>
-          <textarea
-            className="w-full h-48 p-4 rounded-xl border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 focus:ring-2 focus:ring-blue-500 outline-none transition text-slate-700 dark:text-slate-200 text-sm leading-relaxed resize-none font-mono"
-            placeholder="e.g. 'We are looking for a Data Analyst proficient in SQL, experienced with complex joins, window functions, and cohort analysis...'"
-            value={jdText}
-            onChange={(e) => setJdText(e.target.value)}
-          />
+          <div className="flex items-center gap-2 mb-3">
+            <button
+              onClick={() => {
+                setInputMode('text');
+                setSourceLabel('수동 입력');
+              }}
+              className={`text-xs font-semibold px-3 py-1.5 rounded-lg border transition-all ${
+                inputMode === 'text'
+                  ? 'bg-blue-600 text-white border-blue-600'
+                  : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-200 border-transparent'
+              }`}
+            >
+              텍스트 입력
+            </button>
+            <button
+              onClick={() => setInputMode('url')}
+              className={`text-xs font-semibold px-3 py-1.5 rounded-lg border transition-all ${
+                inputMode === 'url'
+                  ? 'bg-blue-600 text-white border-blue-600'
+                  : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-200 border-transparent'
+              }`}
+            >
+              URL 불러오기
+            </button>
+            <button
+              onClick={() => pdfInputRef.current?.click()}
+              className="ml-auto flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:border-blue-400"
+            >
+              <FileDown className="w-3 h-3" /> PDF 업로드
+            </button>
+            <input
+              ref={pdfInputRef}
+              type="file"
+              accept="application/pdf"
+              className="hidden"
+              onChange={handlePdfUpload}
+            />
+          </div>
+
+          {inputMode === 'text' ? (
+            <>
+              <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
+                JD 텍스트 입력
+              </label>
+              <textarea
+                className="w-full h-48 p-4 rounded-xl border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 focus:ring-2 focus:ring-blue-500 outline-none transition text-slate-700 dark:text-slate-200 text-sm leading-relaxed resize-none font-mono"
+                placeholder="예) SQL, 조인, 윈도우 함수, 코호트 분석 경험을 요구합니다..."
+                value={jdText}
+                onChange={(e) => setJdText(e.target.value)}
+              />
+              <div className="text-xs text-slate-500 dark:text-slate-400 mt-2">출처: {sourceLabel}</div>
+              {pdfStatus.error && (
+                <div className="text-xs text-red-500 dark:text-red-300 font-semibold mt-1">
+                  {pdfStatus.error}
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="space-y-3">
+              <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">
+                채용 공고 페이지 URL
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="url"
+                  placeholder="https://careers.example.com/job/123"
+                  className="flex-1 px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 text-sm text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-blue-500 outline-none"
+                  value={urlInput}
+                  onChange={(e) => setUrlInput(e.target.value)}
+                  disabled={urlStatus.loading}
+                />
+                <button
+                  onClick={handleFetchFromUrl}
+                  disabled={!urlInput.trim() || urlStatus.loading}
+                  className="px-4 py-2 rounded-lg bg-slate-800 text-white text-sm font-semibold hover:bg-slate-900 disabled:opacity-50"
+                >
+                  {urlStatus.loading ? '불러오는 중...' : 'URL 불러오기'}
+                </button>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                공고 페이지에서 본문 텍스트를 추출해 JD 입력창으로 옮깁니다. 로그인/차단된 페이지는 실패할 수 있어요.
+              </p>
+              {urlStatus.error && (
+                <div className="text-xs text-red-500 dark:text-red-300 font-semibold">
+                  {urlStatus.error}
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="mt-6 flex justify-end">
             <button
+              onClick={() => {
+                setJdText(JSON.stringify(MOCK_ANALYSIS, null, 2));
+                setSourceLabel('오프라인 샘플');
+                setInputMode('text');
+              }}
+              className="text-xs mr-auto px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-200 hover:border-blue-400"
+            >
+              샘플 JD 불러오기 (오프라인)
+            </button>
+            <button
               onClick={handleAnalyzeJD}
-              disabled={!jdText.trim() || loading}
+              disabled={!jdText.trim() || loading || urlStatus.loading || pdfStatus.loading}
               className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-xl font-bold transition-all disabled:opacity-50 shadow-lg hover:shadow-blue-500/30"
             >
               {loading ? <Loader2 className="animate-spin" /> : <Cpu className="w-5 h-5" />}
-              Analyze & Start Challenge
+              분석 시작
             </button>
           </div>
         </div>
@@ -381,9 +715,9 @@ export default function App() {
         {/* Features Preview */}
         <div className="grid grid-cols-3 gap-4 text-center">
           {[
-            { icon: Briefcase, title: "JD Analysis", desc: "Extracts real-world requirements" },
-            { icon: Database, title: "Virtual DB", desc: "Instantly creates tables & data" },
-            { icon: MessageSquare, title: "AI Feedback", desc: "Get code reviews instantly" }
+            { icon: Briefcase, title: "JD 분석", desc: "실제 요구 역량 추출" },
+            { icon: Database, title: "가상 DB", desc: "스키마·데이터 즉시 생성" },
+            { icon: MessageSquare, title: "AI 피드백", desc: "쿼리 리뷰 즉시 제공" }
           ].map((item, idx) => (
             <div key={idx} className="p-4 rounded-xl bg-white/50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
               <item.icon className="w-6 h-6 mx-auto mb-2 text-blue-500" />
@@ -391,6 +725,60 @@ export default function App() {
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{item.desc}</p>
             </div>
           ))}
+        </div>
+
+        {/* Saved Sessions / History */}
+        <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">저장된 JD 세션</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400">최근 {SESSION_LIMIT}개 자동 저장 · 클릭해서 이어하기</p>
+            </div>
+            <input
+              type="text"
+              placeholder="검색 (회사, 도메인, 키워드)"
+              className="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-sm"
+              value={sessionFilter}
+              onChange={(e) => setSessionFilter(e.target.value)}
+            />
+          </div>
+          <div className="grid md:grid-cols-2 gap-3">
+            {sessions
+              .filter((s) => {
+                const q = sessionFilter.toLowerCase();
+                if (!q) return true;
+                return (
+                  s.analysis?.domain?.toLowerCase().includes(q) ||
+                  s.analysis?.keywords?.join(' ').toLowerCase().includes(q) ||
+                  s.jdText?.toLowerCase().includes(q) ||
+                  (s.sourceLabel || '').toLowerCase().includes(q)
+                );
+              })
+              .map((s) => (
+                <button
+                  key={s.id}
+                  onClick={() => handleLoadSession(s)}
+                  className="text-left p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 hover:border-blue-400 transition"
+                >
+                  <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mb-1">
+                    <span>{new Date(s.createdAt).toLocaleString()}</span>
+                    <span className="flex items-center gap-1">
+                      <LinkIcon className="w-3 h-3" /> {s.sourceLabel}
+                    </span>
+                  </div>
+                  <div className="font-semibold text-slate-800 dark:text-slate-100">{s.analysis?.domain || '도메인 미정'}</div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                    {s.analysis?.keywords?.slice(0, 5).join(', ')}
+                  </div>
+                  <div className="text-xs text-slate-400 line-clamp-2 mt-1">{s.analysis?.problems?.[0]?.description}</div>
+                </button>
+              ))}
+            {sessions.length === 0 && (
+              <div className="text-sm text-slate-500 dark:text-slate-400">
+                아직 저장된 세션이 없습니다. JD를 분석하면 자동으로 저장돼요.
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -413,12 +801,15 @@ export default function App() {
             </h1>
           </div>
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-1 text-xs text-slate-500 bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-full">
-              <span className="font-bold text-blue-600">Keywords:</span>
+            <div className="flex items-center gap-2 text-xs text-slate-600 bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-full">
+              <span className="font-bold text-blue-600">키워드</span>
               {analysis.keywords.slice(0, 3).join(", ")}
             </div>
+            <div className="text-[11px] bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-full text-slate-500">
+              모델: {apiStats.lastModel} · 키: {apiStats.keyPresent ? '설정됨' : '없음'} · 호출: {apiStats.calls}회
+            </div>
             <button onClick={() => setView('setup')} className="text-xs text-slate-500 hover:text-slate-800 dark:hover:text-white">
-              Exit
+              나가기
             </button>
           </div>
         </header>
@@ -428,7 +819,7 @@ export default function App() {
           <aside className="w-72 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col overflow-hidden">
             <div className="p-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
               <h2 className="font-bold text-sm text-slate-700 dark:text-slate-300 flex items-center gap-2">
-                <Layout className="w-4 h-4" /> Tables
+                <Layout className="w-4 h-4" /> 테이블
               </h2>
             </div>
             <div className="flex-1 overflow-y-auto p-4">
@@ -445,7 +836,7 @@ export default function App() {
                   <span className={`text-xs font-bold px-2 py-0.5 rounded uppercase tracking-wide
                       ${problem.difficulty === 'Senior' ? 'bg-red-100 text-red-600' :
                       problem.difficulty === 'Junior' ? 'bg-green-100 text-green-600' : 'bg-yellow-100 text-yellow-700'}`}>
-                    {problem.difficulty}
+                    {toKoreanDifficulty(problem.difficulty)}
                   </span>
                   <h2 className="text-xl font-bold text-slate-800 dark:text-white mt-2">
                     {currentProblemIdx + 1}. {problem.title}
@@ -475,7 +866,7 @@ export default function App() {
 
               {problem.hint && (
                 <div className="text-xs text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 p-3 rounded-lg border border-slate-100 dark:border-slate-700">
-                  <span className="font-bold mr-1">💡 Hint:</span> {problem.hint}
+                  <span className="font-bold mr-1">💡 힌트:</span> {problem.hint}
                 </div>
               )}
             </div>
@@ -487,14 +878,14 @@ export default function App() {
               <div className="flex-1 flex flex-col border-r border-slate-200 dark:border-slate-800">
                 <div className="h-10 bg-slate-100 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between px-4">
                   <span className="text-xs font-bold text-slate-500 flex items-center gap-2">
-                    <Code className="w-3 h-3" /> SQL Editor
+                    <Code className="w-3 h-3" /> SQL 에디터
                   </span>
                   <div className="flex items-center gap-2">
                     <button
                       onClick={runQuery}
                       className="flex items-center gap-1.5 text-xs bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded shadow-sm transition-all"
                     >
-                      <Play className="w-3 h-3 fill-current" /> Run
+                      <Play className="w-3 h-3 fill-current" /> 실행
                     </button>
                   </div>
                 </div>
@@ -514,14 +905,14 @@ export default function App() {
                 {/* Result Header */}
                 <div className="h-10 bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between px-4">
                   <span className="text-xs font-bold text-slate-500 flex items-center gap-2">
-                    <TableIcon className="w-3 h-3" /> Query Result
+                    <TableIcon className="w-3 h-3" /> 쿼리 결과
                   </span>
                   {queryResult && (
                     <button
                       onClick={askAiFeedback}
                       className="text-xs flex items-center gap-1.5 text-blue-600 hover:text-blue-700 font-medium bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded"
                     >
-                      <MessageSquare className="w-3 h-3" /> Get Feedback
+                      <MessageSquare className="w-3 h-3" /> 피드백 받기
                     </button>
                   )}
                 </div>
@@ -544,7 +935,7 @@ export default function App() {
                       </div>
                       <div className="flex-1">
                         <h4 className={`font-bold text-sm mb-1 ${aiFeedback.isCorrect ? 'text-green-800 dark:text-green-300' : 'text-amber-800 dark:text-amber-300'}`}>
-                          {aiFeedback.isCorrect ? "Excellent!" : "Needs Improvement"}
+                          {aiFeedback.isCorrect ? "정답에 가깝습니다" : "개선이 필요합니다"}
                         </h4>
                         <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
                           {aiFeedback.feedback}
