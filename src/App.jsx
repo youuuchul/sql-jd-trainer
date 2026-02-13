@@ -42,18 +42,19 @@ const SESSION_LIMIT = 20;
 // --- Constants & Prompts ---
 
 const SYSTEM_PROMPT_ANALYSIS = `
-You are a Senior Data Engineer & Technical Interviewer.
-Analyze the provided Job Description (JD) and extract key SQL skills.
-Based on the domain (e.g., E-commerce, Fintech, AdTech), generate a relevant database schema and 3 progressive SQL problems.
+당신은 시니어 데이터 엔지니어이자 SQL 면접관입니다.
+입력된 JD를 분석해 핵심 SQL 역량을 추출하고, 도메인에 맞는 스키마와 문제 3개를 생성하세요.
 
-Language rules:
-- Problem title/description/hint MUST be in Korean.
-- Schema/table/column names stay in English.
+언어 규칙(매우 중요):
+- 사용자에게 노출되는 모든 텍스트(도메인, 키워드, 난이도, 제목, 설명, 힌트, expectedLogic)는 한국어로 작성합니다.
+- 테이블명/컬럼명/스키마 구조는 반드시 영어로 유지합니다.
+- SQL 키워드(JOIN, GROUP BY 등)는 원문 그대로 사용 가능합니다.
 
-Output MUST be valid JSON with this structure:
+출력은 반드시 JSON 하나만 반환하세요.
+구조:
 {
-  "domain": "string (e.g., E-commerce)",
-  "keywords": ["string", "string"],
+  "domain": "한국어 문자열",
+  "keywords": ["한국어", "한국어"],
   "schema": [
     {
       "tableName": "string",
@@ -67,17 +68,18 @@ Output MUST be valid JSON with this structure:
   "problems": [
     {
       "id": 1,
-      "difficulty": "Junior/Middle/Senior",
-      "title": "Korean string",
-      "description": "Korean string",
-      "expectedLogic": "Korean string (필요한 SQL 로직 요약, 예: JOIN, GROUP BY)",
-      "hint": "Korean string"
+      "difficulty": "주니어/미들/시니어",
+      "title": "한국어 문자열",
+      "description": "한국어 문자열",
+      "expectedLogic": "한국어로 SQL 로직 요약",
+      "hint": "한국어 문자열"
     }
   ]
 }
 
-Ensure 'data' contains at least 5-10 realistic rows per table.
-Ensure problems match the JD's requirements (e.g., if JD mentions 'Window Functions', include a problem using RANK()).
+조건:
+- 각 테이블에 5~10행 이상의 현실적인 샘플 데이터 포함
+- JD에 언급된 요구사항을 문제에 반영(예: Window Function 언급 시 RANK/ROW_NUMBER 포함)
 `;
 
 const SYSTEM_PROMPT_FEEDBACK = `
@@ -89,7 +91,28 @@ const SYSTEM_PROMPT_FEEDBACK = `
 JSON 형식으로 답하세요: { "feedback": "문장", "isCorrect": true/false }.
 `;
 
+const SYSTEM_PROMPT_TRANSLATE = `
+다음 problems 배열을 한국어로 정제하세요.
+규칙:
+- id 값은 유지
+- difficulty/title/description/expectedLogic/hint는 한국어로 변환
+- SQL 키워드(JOIN, GROUP BY 등)는 그대로 유지 가능
+JSON 형식으로만 반환: { "problems": [ ... ] }
+`;
+
 const getSafeId = () => (crypto?.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`);
+const hasKorean = (text = '') => /[ㄱ-ㅎㅏ-ㅣ가-힣]/.test(text);
+const needsKoreanRewrite = (analysis) => {
+  if (!analysis?.problems?.length) return false;
+  return analysis.problems.some((p) => {
+    if (!hasKorean(p.title)) return true;
+    if (!hasKorean(p.description)) return true;
+    if (p.hint && !hasKorean(p.hint)) return true;
+    if (p.expectedLogic && !hasKorean(p.expectedLogic)) return true;
+    if (p.difficulty && !hasKorean(p.difficulty)) return true;
+    return false;
+  });
+};
 
 // Offline mock for demo / fallback
 const MOCK_ANALYSIS = {
@@ -256,8 +279,9 @@ export default function App() {
   });
 
   const toKoreanDifficulty = (value) => {
-    const map = { Junior: '주니어', Middle: '미들', Senior: '시니어' };
-    return map[value] || value;
+    const normalized = String(value || '').toLowerCase();
+    const map = { junior: '주니어', middle: '미들', senior: '시니어' };
+    return map[normalized] || value;
   };
 
   // Data State
@@ -431,6 +455,21 @@ export default function App() {
         usedMock = true;
         result = MOCK_ANALYSIS;
         setApiStats((prev) => ({ ...prev, lastModel: 'offline-mock' }));
+      }
+
+      if (result && needsKoreanRewrite(result)) {
+        setLoadingMsg("문제를 한국어로 보정하는 중...");
+        try {
+          const rewritten = await callGemini(
+            JSON.stringify({ problems: result.problems }),
+            SYSTEM_PROMPT_TRANSLATE
+          );
+          if (rewritten?.problems?.length) {
+            result = { ...result, problems: rewritten.problems };
+          }
+        } catch (rewriteErr) {
+          console.warn("Korean rewrite failed", rewriteErr);
+        }
       }
       setAnalysis(result);
 
@@ -797,7 +836,7 @@ export default function App() {
               <Database className="w-4 h-4 text-white" />
             </div>
             <h1 className="font-bold text-slate-700 dark:text-slate-200">
-              SQL Trainer <span className="text-slate-400 font-normal">| {analysis.domain}</span>
+              SQL 트레이너 <span className="text-slate-400 font-normal">| {analysis.domain}</span>
             </h1>
           </div>
           <div className="flex items-center gap-4">
