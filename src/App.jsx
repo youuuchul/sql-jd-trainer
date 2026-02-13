@@ -100,6 +100,15 @@ const SYSTEM_PROMPT_TRANSLATE = `
 JSON 형식으로만 반환: { "problems": [ ... ] }
 `;
 
+const SYSTEM_PROMPT_LOCALIZE = `
+다음 JSON의 사용자 노출 텍스트를 한국어로 변환하세요.
+규칙:
+- domain, keywords, problems 내부 텍스트를 한국어로 변환
+- problems는 id 유지, difficulty/title/description/expectedLogic/hint만 변환
+- SQL 키워드(JOIN, GROUP BY 등)는 그대로 유지 가능
+JSON 형식으로만 반환: { "domain": "...", "keywords": ["..."], "problems": [ ... ] }
+`;
+
 const getSafeId = () => (crypto?.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`);
 const hasKorean = (text = '') => /[ㄱ-ㅎㅏ-ㅣ가-힣]/.test(text);
 const needsKoreanRewrite = (analysis) => {
@@ -112,6 +121,16 @@ const needsKoreanRewrite = (analysis) => {
     if (p.difficulty && !hasKorean(p.difficulty)) return true;
     return false;
   });
+};
+const needsKoreanLocalization = (analysis) => {
+  if (!analysis) return false;
+  if (!hasKorean(analysis.domain || '')) return true;
+  if (Array.isArray(analysis.keywords) && analysis.keywords.length > 0) {
+    const anyKorean = analysis.keywords.some((k) => hasKorean(String(k)));
+    if (!anyKorean) return true;
+  }
+  if (needsKoreanRewrite(analysis)) return true;
+  return false;
 };
 
 // Offline mock for demo / fallback
@@ -372,6 +391,22 @@ export default function App() {
     }
   };
 
+  const localizeAnalysis = async (analysis) => {
+    const payload = {
+      domain: analysis.domain,
+      keywords: analysis.keywords,
+      problems: analysis.problems,
+    };
+    const localized = await callGemini(JSON.stringify(payload), SYSTEM_PROMPT_LOCALIZE);
+    if (!localized) return analysis;
+    return {
+      ...analysis,
+      domain: localized.domain || analysis.domain,
+      keywords: localized.keywords || analysis.keywords,
+      problems: localized.problems || analysis.problems,
+    };
+  };
+
   const extractTextFromPdf = async (file) => {
     const pdfjs = await loadPdfJs();
     const buffer = await file.arrayBuffer();
@@ -457,18 +492,29 @@ export default function App() {
         setApiStats((prev) => ({ ...prev, lastModel: 'offline-mock' }));
       }
 
-      if (result && needsKoreanRewrite(result)) {
+      if (result && needsKoreanLocalization(result)) {
         setLoadingMsg("문제를 한국어로 보정하는 중...");
         try {
-          const rewritten = await callGemini(
-            JSON.stringify({ problems: result.problems }),
-            SYSTEM_PROMPT_TRANSLATE
-          );
-          if (rewritten?.problems?.length) {
-            result = { ...result, problems: rewritten.problems };
+          // 1) 전체 텍스트 로컬라이즈 시도
+          if (import.meta.env.VITE_GEMINI_API_KEY) {
+            result = await localizeAnalysis(result);
           }
         } catch (rewriteErr) {
-          console.warn("Korean rewrite failed", rewriteErr);
+          console.warn("Korean localization failed", rewriteErr);
+        }
+        // 2) problems만 재보정(최후 단계)
+        if (needsKoreanRewrite(result)) {
+          try {
+            const rewritten = await callGemini(
+              JSON.stringify({ problems: result.problems }),
+              SYSTEM_PROMPT_TRANSLATE
+            );
+            if (rewritten?.problems?.length) {
+              result = { ...result, problems: rewritten.problems };
+            }
+          } catch (rewriteErr) {
+            console.warn("Korean rewrite failed", rewriteErr);
+          }
         }
       }
       setAnalysis(result);
@@ -514,15 +560,39 @@ export default function App() {
   };
 
   const handleLoadSession = (session) => {
-    try {
-      setAnalysis(session.analysis);
-      setJdText(session.jdText);
-      setSourceLabel(session.sourceLabel || '저장된 세션');
-      buildDatabaseFromAnalysis(session.analysis);
-      setView('workspace');
-    } catch (err) {
-      alert('세션을 불러오지 못했습니다: ' + err.message);
-    }
+    (async () => {
+      try {
+        setLoading(true);
+        setLoadingMsg("저장된 세션을 불러오는 중...");
+        let analysisData = session.analysis;
+        if (analysisData && needsKoreanLocalization(analysisData) && import.meta.env.VITE_GEMINI_API_KEY) {
+          setLoadingMsg("저장된 세션을 한국어로 보정하는 중...");
+          try {
+            const localized = await localizeAnalysis(analysisData);
+            analysisData = localized;
+            // Update stored session to avoid repeated translation
+            setSessions((prev) => {
+              const updated = prev.map((s) =>
+                s.id === session.id ? { ...s, analysis: localized } : s
+              );
+              localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+              return updated;
+            });
+          } catch (e) {
+            console.warn("Session localization failed", e);
+          }
+        }
+        setAnalysis(analysisData);
+        setJdText(session.jdText);
+        setSourceLabel(session.sourceLabel || '저장된 세션');
+        buildDatabaseFromAnalysis(analysisData);
+        setView('workspace');
+      } catch (err) {
+        alert('세션을 불러오지 못했습니다: ' + err.message);
+      } finally {
+        setLoading(false);
+      }
+    })();
   };
 
   // Load JD text from a URL (basic fetch + HTML to text)
