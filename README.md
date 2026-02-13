@@ -37,6 +37,16 @@ cd sql-jd-trainer
 npm install
 ```
 
+### 환경 설정
+
+루트에 `.env.local`을 만들고 Gemini API 키를 지정하세요.
+
+```
+VITE_GEMINI_API_KEY=YOUR_KEY
+```
+
+키가 없거나 네트워크가 막힌 경우, 앱 내에서 제공하는 **샘플 JD 불러오기(오프라인)** 버튼으로 데모를 바로 사용할 수 있습니다.
+
 ### 실행
 
 ```bash
