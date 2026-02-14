@@ -438,6 +438,8 @@ export default function App() {
     lastModel: 'gemini-2.5-flash-preview-09-2025',
     keyPresent: !!import.meta.env.VITE_GEMINI_API_KEY
   });
+  const [dbMode, setDbMode] = useState('browser'); // 'browser' | 'mysql'
+  const [backendStatus, setBackendStatus] = useState({ checked: false, available: false, error: '' });
 
   const toKoreanDifficulty = (value) => {
     const normalized = String(value || '').toLowerCase();
@@ -546,6 +548,26 @@ export default function App() {
     }
   }, []);
 
+  // Check backend availability (MySQL proxy)
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/health');
+        if (!res.ok) throw new Error(`API 응답 오류 (${res.status})`);
+        if (cancelled) return;
+        setBackendStatus({ checked: true, available: true, error: '' });
+      } catch (e) {
+        if (cancelled) return;
+        setBackendStatus({ checked: true, available: false, error: e.message || '백엔드 연결 실패' });
+        setDbMode('browser');
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // Gemini API Caller
   const callGemini = async (prompt, systemInstruction = "") => {
     try {
@@ -580,6 +602,24 @@ export default function App() {
     } catch (error) {
       console.error("Gemini Error:", error);
       throw error;
+    }
+  };
+
+  const initMysqlSchema = async (schema) => {
+    const res = await fetch('/api/init', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ schema }),
+    });
+    if (!res.ok) {
+      let message = 'MySQL 초기화 실패';
+      try {
+        const data = await res.json();
+        message = data?.error || message;
+      } catch {
+        // ignore
+      }
+      throw new Error(message);
     }
   };
 
@@ -714,6 +754,19 @@ export default function App() {
       // 2. Initialize In-Memory DB
       setLoadingMsg(`가상 ${result.domain || 'Database'} 환경을 준비하는 중...`);
 
+      if (backendStatus.available) {
+        try {
+          setLoadingMsg("MySQL에 스키마를 적용하는 중...");
+          await initMysqlSchema(result.schema);
+          setDbMode('mysql');
+        } catch (e) {
+          console.warn("MySQL init failed, falling back to browser DB", e);
+          setDbMode('browser');
+        }
+      } else {
+        setDbMode('browser');
+      }
+
       buildDatabaseFromAnalysis(result);
       setView('workspace');
 
@@ -777,6 +830,18 @@ export default function App() {
         setAnalysis(analysisData);
         setJdText(session.jdText);
         setSourceLabel(session.sourceLabel || '저장된 세션');
+        if (backendStatus.available) {
+          setLoadingMsg("MySQL에 스키마를 적용하는 중...");
+          try {
+            await initMysqlSchema(analysisData.schema);
+            setDbMode('mysql');
+          } catch (e) {
+            console.warn("MySQL init failed, fallback to browser DB", e);
+            setDbMode('browser');
+          }
+        } else {
+          setDbMode('browser');
+        }
         buildDatabaseFromAnalysis(analysisData);
         setView('workspace');
       } catch (err) {
@@ -821,14 +886,35 @@ export default function App() {
     setUrlStatus({ loading: false, error: '' });
   };
 
-  const runQuery = () => {
-    if (!alasqlRef.current) return;
+  const runQuery = async () => {
     setQueryError(null);
     setQueryResult(null);
     setAiFeedback(null);
 
     try {
       const normalizedQuery = normalizeSql(userQuery);
+      if (dbMode === 'mysql') {
+        const res = await fetch('/api/query', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sql: normalizedQuery }),
+        });
+        if (!res.ok) {
+          let message = '쿼리 실행 실패';
+          try {
+            const data = await res.json();
+            message = data?.error || message;
+          } catch {
+            // ignore
+          }
+          throw new Error(message);
+        }
+        const data = await res.json();
+        setQueryResult(data?.rows || []);
+        return;
+      }
+
+      if (!alasqlRef.current) return;
       // Multiple statements support? AlaSQL supports it but returns array.
       // We focus on the last result for display usually.
       const res = alasqlRef.current(normalizedQuery);
@@ -1109,6 +1195,9 @@ export default function App() {
             </div>
             <div className="text-[11px] bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-full text-slate-500">
               모델: {apiStats.lastModel} · 키: {apiStats.keyPresent ? '설정됨' : '없음'} · 호출: {apiStats.calls}회
+            </div>
+            <div className="text-[11px] bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-full text-slate-500">
+              DB: {dbMode === 'mysql' ? 'MySQL' : '브라우저'}
             </div>
             <button onClick={() => setView('setup')} className="text-xs text-slate-500 hover:text-slate-800 dark:hover:text-white">
               나가기
