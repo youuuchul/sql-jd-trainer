@@ -391,6 +391,21 @@ const SqlEditor = ({ value, onChange }) => {
     };
   }, []);
 
+  // Persist last query per session (debounced)
+  useEffect(() => {
+    if (!currentSessionId || view !== 'workspace') return;
+    const timer = setTimeout(() => {
+      setSessions((prev) => {
+        const updated = prev.map((s) =>
+          s.id === currentSessionId ? { ...s, lastQuery: userQuery } : s
+        );
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+        return updated;
+      });
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [currentSessionId, userQuery, view]);
+
   useEffect(() => {
     const view = viewRef.current;
     if (!view) return;
@@ -455,6 +470,7 @@ export default function App() {
   const [queryError, setQueryError] = useState(null);
   const [aiFeedback, setAiFeedback] = useState(null);
   const [dbReady, setDbReady] = useState(false);
+  const [currentSessionId, setCurrentSessionId] = useState(null);
 
   // References
   const alasqlRef = useRef(null);
@@ -676,10 +692,11 @@ export default function App() {
 
   const saveSession = (payload) => {
     const newList = [payload, ...sessions].slice(0, SESSION_LIMIT);
+    setCurrentSessionId(payload.id);
     persistSessions(newList);
   };
 
-  const buildDatabaseFromAnalysis = (result) => {
+  const buildDatabaseFromAnalysis = (result, initialQuery = '') => {
     if (!alasqlRef.current) throw new Error("SQL Engine not loaded yet. Please refresh.");
 
     alasqlRef.current('CREATE DATABASE IF NOT EXISTS sql_trainer; USE sql_trainer;');
@@ -696,7 +713,9 @@ export default function App() {
     setQueryResult(null);
     setQueryError(null);
     setAiFeedback(null);
-    if (result.schema.length > 0) {
+    if (initialQuery) {
+      setUserQuery(initialQuery);
+    } else if (result.schema.length > 0) {
       setUserQuery(`SELECT * FROM ${result.schema[0].tableName} LIMIT 5;`);
     }
   };
@@ -767,7 +786,8 @@ export default function App() {
         setDbMode('browser');
       }
 
-      buildDatabaseFromAnalysis(result);
+      const defaultQuery = result.schema.length > 0 ? `SELECT * FROM ${result.schema[0].tableName} LIMIT 5;` : '';
+      buildDatabaseFromAnalysis(result, defaultQuery);
       setView('workspace');
 
       saveSession({
@@ -776,12 +796,16 @@ export default function App() {
         jdText,
         analysis: result,
         sourceLabel: usedMock ? `${sourceLabel} · (mock)` : sourceLabel,
+        lastQuery: defaultQuery,
       });
     } catch (err) {
       // Last-resort fallback: if analysis is missing, load mock and keep user in workspace
       if (!analysis) {
         try {
-          buildDatabaseFromAnalysis(MOCK_ANALYSIS);
+          const defaultQuery = MOCK_ANALYSIS.schema.length > 0
+            ? `SELECT * FROM ${MOCK_ANALYSIS.schema[0].tableName} LIMIT 5;`
+            : '';
+          buildDatabaseFromAnalysis(MOCK_ANALYSIS, defaultQuery);
           setAnalysis(MOCK_ANALYSIS);
           setView('workspace');
           saveSession({
@@ -790,6 +814,7 @@ export default function App() {
             jdText: '(offline mock)',
             analysis: MOCK_ANALYSIS,
             sourceLabel: 'offline mock',
+            lastQuery: defaultQuery,
           });
           alert("네트워크 없이도 샘플 세션으로 시작합니다.");
           return;
@@ -842,7 +867,8 @@ export default function App() {
         } else {
           setDbMode('browser');
         }
-        buildDatabaseFromAnalysis(analysisData);
+        setCurrentSessionId(session.id);
+        buildDatabaseFromAnalysis(analysisData, session.lastQuery || '');
         setView('workspace');
       } catch (err) {
         alert('세션을 불러오지 못했습니다: ' + err.message);
