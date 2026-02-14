@@ -28,6 +28,76 @@ const loadPdfJs = async () => {
   return pdfjs;
 };
 
+// Lazy CodeMirror loader (browser-only, uses CDN to avoid bundling)
+const loadCodeMirror = async () => {
+  if (window.__codemirror) return window.__codemirror;
+
+  const [
+    cmView,
+    cmState,
+    cmCommands,
+    cmLangSql,
+    cmComment,
+    cmLanguage,
+  ] = await Promise.all([
+    import(/* @vite-ignore */ 'https://cdn.jsdelivr.net/npm/@codemirror/view@6.36.4/dist/index.min.js'),
+    import(/* @vite-ignore */ 'https://cdn.jsdelivr.net/npm/@codemirror/state@6.4.1/dist/index.min.js'),
+    import(/* @vite-ignore */ 'https://cdn.jsdelivr.net/npm/@codemirror/commands@6.3.3/dist/index.min.js'),
+    import(/* @vite-ignore */ 'https://cdn.jsdelivr.net/npm/@codemirror/lang-sql@6.8.0/dist/index.min.js'),
+    import(/* @vite-ignore */ 'https://cdn.jsdelivr.net/npm/@codemirror/comment@6.3.1/dist/index.min.js'),
+    import(/* @vite-ignore */ 'https://cdn.jsdelivr.net/npm/@codemirror/language@6.10.2/dist/index.min.js'),
+  ]);
+
+  const {
+    EditorView,
+    keymap,
+    lineNumbers,
+    highlightActiveLine,
+    highlightActiveLineGutter,
+    drawSelection,
+    dropCursor,
+    highlightSpecialChars,
+  } = cmView;
+  const { EditorState } = cmState;
+  const { defaultKeymap, history, historyKeymap, indentWithTab } = cmCommands;
+  const { sql, MySQL } = cmLangSql;
+  const { commentKeymap } = cmComment;
+  const { indentOnInput, syntaxHighlighting, defaultHighlightStyle } = cmLanguage;
+
+  const theme = EditorView.theme({
+    "&": { height: "100%", fontSize: "12px" },
+    ".cm-scroller": {
+      fontFamily:
+        'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+    },
+    ".cm-content": { padding: "12px" },
+    ".cm-gutters": { backgroundColor: "transparent", border: "none", color: "#94a3b8" },
+  });
+
+  const extensions = (onChange) => [
+    lineNumbers(),
+    highlightActiveLineGutter(),
+    highlightActiveLine(),
+    highlightSpecialChars(),
+    history(),
+    drawSelection(),
+    dropCursor(),
+    indentOnInput(),
+    syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
+    sql({ dialect: MySQL }),
+    keymap.of([...commentKeymap, indentWithTab, ...defaultKeymap, ...historyKeymap]),
+    EditorView.updateListener.of((v) => {
+      if (v.docChanged) onChange(v.state.doc.toString());
+    }),
+    EditorView.lineWrapping,
+    theme,
+  ];
+
+  const api = { EditorView, EditorState, extensions };
+  window.__codemirror = api;
+  return api;
+};
+
 const STORAGE_KEY = 'sqlJdSessions';
 const SESSION_LIMIT = 20;
 
@@ -132,6 +202,21 @@ const needsKoreanLocalization = (analysis) => {
   if (needsKoreanRewrite(analysis)) return true;
   return false;
 };
+
+const normalizeSql = (sql = '') =>
+  sql
+    .split('\n')
+    .map((line) => {
+      const trimmed = line.trimStart();
+      if (trimmed.startsWith('#')) {
+        return line.replace('#', '--');
+      }
+      if (trimmed.startsWith('//')) {
+        return line.replace('//', '--');
+      }
+      return line;
+    })
+    .join('\n');
 
 // Offline mock for demo / fallback
 const MOCK_ANALYSIS = {
@@ -276,6 +361,63 @@ const ResultTable = ({ data, error }) => {
   );
 };
 
+const SqlEditor = ({ value, onChange }) => {
+  const hostRef = useRef(null);
+  const viewRef = useRef(null);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const cm = await loadCodeMirror();
+        if (cancelled || !hostRef.current) return;
+        const state = cm.EditorState.create({
+          doc: value || '',
+          extensions: cm.extensions((nextValue) => onChange(nextValue)),
+        });
+        viewRef.current = new cm.EditorView({
+          state,
+          parent: hostRef.current,
+        });
+        setReady(true);
+      } catch (err) {
+        console.warn('CodeMirror load failed, fallback to textarea', err);
+      }
+    })();
+    return () => {
+      cancelled = true;
+      if (viewRef.current) viewRef.current.destroy();
+    };
+  }, []);
+
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view) return;
+    const current = view.state.doc.toString();
+    if (current !== value) {
+      view.dispatch({
+        changes: { from: 0, to: view.state.doc.length, insert: value || '' },
+      });
+    }
+  }, [value]);
+
+  return (
+    <div className="absolute inset-0">
+      <div ref={hostRef} className="h-full w-full" />
+      {!ready && (
+        <textarea
+          className="absolute inset-0 w-full h-full p-4 font-mono text-sm bg-transparent border-none outline-none resize-none text-slate-800 dark:text-slate-200 leading-6"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          spellCheck={false}
+          placeholder="SELECT * FROM orders..."
+        />
+      )}
+    </div>
+  );
+};
+
 // --- Main Application ---
 
 export default function App() {
@@ -319,6 +461,54 @@ export default function App() {
   // Initialize AlaSQL
   useEffect(() => {
     const initSqlEngine = async () => {
+      const registerSqlFunctions = (alasql) => {
+        if (!alasql?.fn) return;
+
+        const toDate = (val) => {
+          if (val instanceof Date) return val;
+          if (typeof val === 'number') return new Date(val);
+          return new Date(String(val));
+        };
+
+        // Supports DATEDIFF(end, start) and DATEDIFF(unit, start, end)
+        alasql.fn.DATEDIFF = (...args) => {
+          if (args.length < 2) return null;
+          if (args.length === 2) {
+            const [end, start] = args;
+            const diffMs = toDate(end) - toDate(start);
+            return Math.floor(diffMs / 86400000);
+          }
+          const [unitRaw, start, end] = args;
+          const unit = String(unitRaw || '').toLowerCase();
+          const startDate = toDate(start);
+          const endDate = toDate(end);
+          const diffMs = endDate - startDate;
+
+          if (['year', 'yy', 'yyyy'].includes(unit)) {
+            return endDate.getFullYear() - startDate.getFullYear();
+          }
+          if (['month', 'mm', 'm'].includes(unit)) {
+            return (
+              (endDate.getFullYear() - startDate.getFullYear()) * 12 +
+              (endDate.getMonth() - startDate.getMonth())
+            );
+          }
+          if (['day', 'dd', 'd'].includes(unit)) {
+            return Math.floor(diffMs / 86400000);
+          }
+          if (['hour', 'hh'].includes(unit)) {
+            return Math.floor(diffMs / 3600000);
+          }
+          if (['minute', 'mi', 'n'].includes(unit)) {
+            return Math.floor(diffMs / 60000);
+          }
+          if (['second', 'ss', 's'].includes(unit)) {
+            return Math.floor(diffMs / 1000);
+          }
+          return Math.floor(diffMs / 86400000);
+        };
+      };
+
       // Check if alasql is available globally (from CDN)
       // Since we can't easily inject CDN in this environment, we will check window.
       // If not, we will try to dynamically load it.
@@ -329,6 +519,7 @@ export default function App() {
           script.async = true;
           script.onload = () => {
             alasqlRef.current = window.alasql;
+            registerSqlFunctions(alasqlRef.current);
             console.log("AlaSQL loaded successfully");
           };
           document.body.appendChild(script);
@@ -337,6 +528,7 @@ export default function App() {
         }
       } else {
         alasqlRef.current = window.alasql;
+        registerSqlFunctions(alasqlRef.current);
       }
     };
     initSqlEngine();
@@ -636,9 +828,10 @@ export default function App() {
     setAiFeedback(null);
 
     try {
+      const normalizedQuery = normalizeSql(userQuery);
       // Multiple statements support? AlaSQL supports it but returns array.
       // We focus on the last result for display usually.
-      const res = alasqlRef.current(userQuery);
+      const res = alasqlRef.current(normalizedQuery);
       // AlaSQL returns array of arrays if multiple queries, or array of objects if single
       // We handle single query mostly
       if (Array.isArray(res) && res.length > 0 && Array.isArray(res[0])) {
@@ -999,13 +1192,7 @@ export default function App() {
                   </div>
                 </div>
                 <div className="flex-1 bg-slate-50 dark:bg-slate-900 relative">
-                  <textarea
-                    className="absolute inset-0 w-full h-full p-4 font-mono text-sm bg-transparent border-none outline-none resize-none text-slate-800 dark:text-slate-200 leading-6"
-                    value={userQuery}
-                    onChange={(e) => setUserQuery(e.target.value)}
-                    spellCheck={false}
-                    placeholder="SELECT * FROM orders..."
-                  />
+                  <SqlEditor value={userQuery} onChange={setUserQuery} />
                 </div>
               </div>
 
