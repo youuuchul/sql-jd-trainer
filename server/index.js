@@ -10,6 +10,7 @@ app.use(cors());
 app.use(express.json({ limit: '2mb' }));
 
 const dbName = process.env.MYSQL_DATABASE || 'sql_jd_trainer';
+const sqlMode = process.env.MYSQL_SQL_MODE || 'STRICT_TRANS_TABLES,NO_ENGINE_SUBSTITUTION';
 const baseConfig = {
   host: process.env.MYSQL_HOST || '127.0.0.1',
   port: Number(process.env.MYSQL_PORT || 3306),
@@ -40,8 +41,18 @@ const isFloat = (value) =>
 const isBool = (value) =>
   typeof value === 'boolean' || value === 'true' || value === 'false';
 
-const inferColumnType = (values) => {
-  if (!values.length) return 'TEXT';
+const inferColumnType = (name, values) => {
+  const col = String(name || '').toLowerCase();
+  if (!values.length) {
+    if (col.endsWith('_id') || col === 'id') return 'INT';
+    if (col.includes('date')) return 'DATE';
+    if (col.includes('time') || col.includes('timestamp') || col.endsWith('_at')) return 'DATETIME';
+    if (col.startsWith('is_') || col.startsWith('has_') || col.endsWith('_flag')) return 'TINYINT(1)';
+    if (col.includes('amount') || col.includes('price') || col.includes('total') || col.includes('rate') || col.includes('score') || col.includes('ratio')) {
+      return 'DECIMAL(18,4)';
+    }
+    return 'TEXT';
+  }
   if (values.every(isBool)) return 'TINYINT(1)';
   if (values.every(isInt)) return 'INT';
   if (values.every((v) => isInt(v) || isFloat(v))) return 'DECIMAL(18,4)';
@@ -60,6 +71,11 @@ const getDbPool = async () => {
     dbPool = mysql.createPool({ ...baseConfig, database: dbName });
   }
   return dbPool;
+};
+
+const applySqlMode = async (connection) => {
+  if (!sqlMode) return;
+  await connection.query('SET SESSION sql_mode = ?', [sqlMode]);
 };
 
 const stripLeadingComments = (sql) => {
@@ -94,6 +110,7 @@ app.post('/api/init', async (req, res) => {
     const pool = await getDbPool();
     const connection = await pool.getConnection();
     try {
+      await applySqlMode(connection);
       await connection.query('SET FOREIGN_KEY_CHECKS=0');
 
       for (const table of schema) {
@@ -108,7 +125,7 @@ app.post('/api/init', async (req, res) => {
           const values = data
             .map((row) => row?.[col])
             .filter((v) => v !== null && v !== undefined);
-          return `${escapeId(col)} ${inferColumnType(values)}`;
+          return `${escapeId(col)} ${inferColumnType(col, values)}`;
         });
         await connection.query(`CREATE TABLE ${escapeId(table.tableName)} (${columnDefs.join(', ')})`);
 
@@ -145,8 +162,14 @@ app.post('/api/query', async (req, res) => {
 
   try {
     const pool = await getDbPool();
-    const [rows] = await pool.query(sql);
-    return res.json({ rows });
+    const connection = await pool.getConnection();
+    try {
+      await applySqlMode(connection);
+      const [rows] = await connection.query(sql);
+      return res.json({ rows });
+    } finally {
+      connection.release();
+    }
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
