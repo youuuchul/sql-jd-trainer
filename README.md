@@ -47,6 +47,26 @@ VITE_GEMINI_API_KEY=YOUR_KEY
 
 키가 없거나 네트워크가 막힌 경우, 앱 내에서 제공하는 **샘플 JD 불러오기(오프라인)** 버튼으로 데모를 바로 사용할 수 있습니다.
 
+### MySQL 모드 (DATE_FORMAT/CTE 지원)
+
+브라우저 내장 DB(AlaSQL)는 MySQL과 100% 호환이 아니므로, `DATE_FORMAT`, `WITH (CTE)` 같은 문법을 사용하려면 **MySQL 모드**를 권장합니다.
+
+1) MySQL 8.x 실행 (로컬 설치 또는 Docker)
+2) `server/.env.example`을 복사해 `server/.env` 생성 후 접속 정보 입력
+3) 서버 실행
+
+```bash
+npm run server
+```
+
+4) 프론트 실행
+
+```bash
+npm run dev
+```
+
+프론트는 `/api` 경로로 백엔드에 연결되며, 연결 성공 시 상단에 **DB: MySQL** 표시가 뜹니다.
+
 ### 실행
 
 ```bash
