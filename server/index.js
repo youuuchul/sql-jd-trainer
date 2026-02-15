@@ -99,7 +99,7 @@ const stripLeadingComments = (sql) => {
   return filtered.join(' ').trim();
 };
 
-const runMysql = (sql) =>
+const runMysql = (sql, useDb = false) =>
   new Promise((resolve, reject) => {
     const args = [
       '--protocol=TCP',
@@ -110,13 +110,14 @@ const runMysql = (sql) =>
       String(config.port),
       '-u',
       config.user,
-      '-D',
-      config.database,
       '--batch',
       '--raw',
       '-e',
       sql,
     ];
+    if (useDb) {
+      args.splice(args.length - 2, 0, '-D', config.database);
+    }
 
     execFile(
       'mysql',
@@ -222,7 +223,8 @@ const server = http.createServer(async (req, res) => {
 
   if (req.url === '/api/health' && req.method === 'GET') {
     try {
-      const output = await runMysql('SELECT 1');
+      await runMysql(`CREATE DATABASE IF NOT EXISTS ${escapeId(config.database)}`);
+      const output = await runMysql('SELECT 1', true);
       if (output.includes('1')) {
         json(res, 200, { ok: true, database: config.database });
       } else {
@@ -244,7 +246,7 @@ const server = http.createServer(async (req, res) => {
         return;
       }
       const sql = initSchemaSql(schema);
-      await runMysql(sql);
+      await runMysql(sql, true);
       json(res, 200, { ok: true });
     } catch (err) {
       json(res, 500, { error: err.message });
@@ -267,7 +269,7 @@ const server = http.createServer(async (req, res) => {
         return;
       }
       const querySql = `SET SESSION sql_mode='${config.sqlMode}';\n${sql}`;
-      const output = await runMysql(querySql);
+      const output = await runMysql(querySql, true);
       const rows = parseMysqlTsv(output);
       json(res, 200, { rows });
     } catch (err) {
