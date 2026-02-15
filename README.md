@@ -16,15 +16,18 @@ AI가 해당 직무에 요구되는 SQL 역량을 분석하여 가상 데이터�
   분석된 도메인(이커머스, 핀테크 등)에 맞는 가상 테이블 구조 및 샘플 데이터 자동 생성
 
 - **브라우저 내 SQL 실행**  
-  AlaSQL(In-memory DB)을 사용하여 서버 없이 브라우저에서 즉시 쿼리 실행
+  AlaSQL(In-memory DB)을 사용하여 서버 없이 브라우저에서 즉시 쿼리 실행 (기본 모드)
 
 - **AI 코드 리뷰**  
   제출한 SQL 쿼리에 대해 정답 여부 판단 및 성능·가독성 관점의 개선 피드백 제공
 
+- **MySQL 모드**  
+  실제 MySQL 엔진에 연결해 `DATE_FORMAT`, `WITH (CTE)` 등 MySQL 문법을 그대로 실행
+
 ## 🛠 Tech Stack
 
 - **Frontend**: React, Vite, Tailwind CSS, Lucide React  
-- **SQL Engine**: AlaSQL (In-memory Database)  
+- **SQL Engine**: AlaSQL (In-memory Database), MySQL (옵션)  
 - **AI**: Google Gemini API  
 
 ## 시작하기
@@ -73,6 +76,16 @@ npm run dev
 ```bash
 npm run dev
 ```
+
+## 개발 현황
+
+- ✅ JD 입력: 텍스트/URL/PDF 지원
+- ✅ 문제 생성: Gemini 기반, 한국어 출력 보정
+- ✅ SQL 에디터: CodeMirror 5 기반, 주석 토글 지원
+- ✅ MySQL 모드: 실제 MySQL 엔진 연결(/api)
+- ✅ 세션 저장: 최근 세션 저장 및 검색
+- ⏳ 스키마 컬럼 표시 개선
+- ⏳ 문제 전환 시 에디터 상태 정책 정의
 
 ## 라이선스 (License)
 
