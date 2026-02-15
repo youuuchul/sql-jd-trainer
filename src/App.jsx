@@ -377,7 +377,7 @@ const SqlEditor = ({ value, onChange }) => {
         cmRef.current = null;
       }
     };
-  }, [onChange, value]);
+  }, [onChange]);
 
   useEffect(() => {
     const cm = cmRef.current;
@@ -399,7 +399,6 @@ const SqlEditor = ({ value, onChange }) => {
         onChange={(e) => onChange(e.target.value)}
         spellCheck={false}
         placeholder="SELECT * FROM orders..."
-        readOnly={ready}
       />
     </div>
   );
