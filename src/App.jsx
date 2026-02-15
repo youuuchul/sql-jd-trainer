@@ -32,6 +32,15 @@ const loadPdfJs = async () => {
 const loadCodeMirror = async () => {
   if (window.__codemirror) return window.__codemirror;
 
+  // Inject CodeMirror base styles once
+  if (!document.querySelector('link[data-codemirror="base"]')) {
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = 'https://cdn.jsdelivr.net/npm/@codemirror/view@6.36.4/dist/style.css';
+    link.setAttribute('data-codemirror', 'base');
+    document.head.appendChild(link);
+  }
+
   const [
     cmView,
     cmState,
@@ -65,12 +74,12 @@ const loadCodeMirror = async () => {
   const { indentOnInput, syntaxHighlighting, defaultHighlightStyle } = cmLanguage;
 
   const theme = EditorView.theme({
-    "&": { height: "100%", fontSize: "12px" },
+    "&": { height: "100%", fontSize: "12px", color: "#0f172a" },
     ".cm-scroller": {
       fontFamily:
         'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
     },
-    ".cm-content": { padding: "12px" },
+    ".cm-content": { padding: "12px", caretColor: "#0f172a" },
     ".cm-gutters": { backgroundColor: "transparent", border: "none", color: "#94a3b8" },
   });
 
