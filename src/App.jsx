@@ -28,83 +28,52 @@ const loadPdfJs = async () => {
   return pdfjs;
 };
 
-// Lazy CodeMirror loader (browser-only, uses CDN to avoid bundling)
+// Lazy CodeMirror 5 loader (browser-only, uses CDN to avoid bundling)
 const loadCodeMirror = async () => {
-  if (window.__codemirror) return window.__codemirror;
+  if (window.__codemirror5) return window.__codemirror5;
 
-  // Inject CodeMirror base styles once
-  if (!document.querySelector('link[data-codemirror="base"]')) {
+  const loadScript = (src) =>
+    new Promise((resolve, reject) => {
+      if (document.querySelector(`script[src="${src}"]`)) {
+        resolve();
+        return;
+      }
+      const script = document.createElement('script');
+      script.src = src;
+      script.async = true;
+      script.onload = () => resolve();
+      script.onerror = () => reject(new Error(`Failed to load ${src}`));
+      document.body.appendChild(script);
+    });
+
+  const ensureStyle = (href, key) => {
+    if (document.querySelector(`link[data-codemirror="${key}"]`)) return;
     const link = document.createElement('link');
     link.rel = 'stylesheet';
-    link.href = 'https://unpkg.com/@codemirror/view@6.36.4/dist/style.css';
-    link.setAttribute('data-codemirror', 'base');
+    link.href = href;
+    link.setAttribute('data-codemirror', key);
     document.head.appendChild(link);
+  };
+
+  ensureStyle('https://cdn.jsdelivr.net/npm/codemirror@5.65.16/lib/codemirror.css', 'base');
+
+  if (!document.querySelector('style[data-codemirror="theme"]')) {
+    const style = document.createElement('style');
+    style.setAttribute('data-codemirror', 'theme');
+    style.textContent = `
+      .CodeMirror { height: 100%; font-size: 12px; }
+      .CodeMirror-lines { padding: 12px 0; }
+    `;
+    document.head.appendChild(style);
   }
 
-  const [
-    cmView,
-    cmState,
-    cmCommands,
-    cmLangSql,
-    cmComment,
-    cmLanguage,
-  ] = await Promise.all([
-    import(/* @vite-ignore */ 'https://esm.sh/@codemirror/view@6.36.4?bundle'),
-    import(/* @vite-ignore */ 'https://esm.sh/@codemirror/state@6.4.1?bundle'),
-    import(/* @vite-ignore */ 'https://esm.sh/@codemirror/commands@6.3.3?bundle'),
-    import(/* @vite-ignore */ 'https://esm.sh/@codemirror/lang-sql@6.8.0?bundle'),
-    import(/* @vite-ignore */ 'https://esm.sh/@codemirror/comment@6.3.1?bundle'),
-    import(/* @vite-ignore */ 'https://esm.sh/@codemirror/language@6.10.2?bundle'),
-  ]);
+  await loadScript('https://cdn.jsdelivr.net/npm/codemirror@5.65.16/lib/codemirror.js');
+  await loadScript('https://cdn.jsdelivr.net/npm/codemirror@5.65.16/mode/sql/sql.js');
+  await loadScript('https://cdn.jsdelivr.net/npm/codemirror@5.65.16/addon/comment/comment.js');
+  await loadScript('https://cdn.jsdelivr.net/npm/codemirror@5.65.16/addon/edit/matchbrackets.js');
 
-  const {
-    EditorView,
-    keymap,
-    lineNumbers,
-    highlightActiveLine,
-    highlightActiveLineGutter,
-    drawSelection,
-    dropCursor,
-    highlightSpecialChars,
-  } = cmView;
-  const { EditorState } = cmState;
-  const { defaultKeymap, history, historyKeymap, indentWithTab } = cmCommands;
-  const { sql, MySQL } = cmLangSql;
-  const { commentKeymap } = cmComment;
-  const { indentOnInput, syntaxHighlighting, defaultHighlightStyle } = cmLanguage;
-
-  const theme = EditorView.theme({
-    "&": { height: "100%", fontSize: "12px", color: "#0f172a" },
-    ".cm-scroller": {
-      fontFamily:
-        'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
-    },
-    ".cm-content": { padding: "12px", caretColor: "#0f172a" },
-    ".cm-gutters": { backgroundColor: "transparent", border: "none", color: "#94a3b8" },
-  });
-
-  const extensions = (onChange) => [
-    lineNumbers(),
-    highlightActiveLineGutter(),
-    highlightActiveLine(),
-    highlightSpecialChars(),
-    history(),
-    drawSelection(),
-    dropCursor(),
-    indentOnInput(),
-    syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
-    sql({ dialect: MySQL }),
-    keymap.of([...commentKeymap, indentWithTab, ...defaultKeymap, ...historyKeymap]),
-    EditorView.updateListener.of((v) => {
-      if (v.docChanged) onChange(v.state.doc.toString());
-    }),
-    EditorView.lineWrapping,
-    theme,
-  ];
-
-  const api = { EditorView, EditorState, extensions };
-  window.__codemirror = api;
-  return api;
+  window.__codemirror5 = window.CodeMirror;
+  return window.CodeMirror;
 };
 
 const STORAGE_KEY = 'sqlJdSessions';
@@ -370,27 +339,32 @@ const ResultTable = ({ data, error }) => {
   );
 };
 
-  const SqlEditor = ({ value, onChange }) => {
-    const hostRef = useRef(null);
-    const viewRef = useRef(null);
-    const [ready, setReady] = useState(false);
+const SqlEditor = ({ value, onChange }) => {
+  const textareaRef = useRef(null);
+  const cmRef = useRef(null);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const cm = await loadCodeMirror();
-        if (cancelled || !hostRef.current) return;
-        const state = cm.EditorState.create({
-          doc: value || '',
-          extensions: cm.extensions((nextValue) => onChange(nextValue)),
+        const CodeMirror = await loadCodeMirror();
+        if (cancelled || !textareaRef.current) return;
+        cmRef.current = CodeMirror.fromTextArea(textareaRef.current, {
+          mode: 'text/x-mysql',
+          lineNumbers: true,
+          matchBrackets: true,
+          tabSize: 2,
+          indentUnit: 2,
+          lineWrapping: true,
+          extraKeys: {
+            'Cmd-/': 'toggleComment',
+            'Ctrl-/': 'toggleComment',
+          },
         });
-        viewRef.current = new cm.EditorView({
-          state,
-          parent: hostRef.current,
-        });
-        // Ensure editor can receive focus/clicks
-        viewRef.current.focus();
+        cmRef.current.setValue(value || '');
+        cmRef.current.on('change', (cm) => onChange(cm.getValue()));
+        cmRef.current.focus();
         setReady(true);
       } catch (err) {
         console.warn('CodeMirror load failed, fallback to textarea', err);
@@ -398,33 +372,35 @@ const ResultTable = ({ data, error }) => {
     })();
     return () => {
       cancelled = true;
-      if (viewRef.current) viewRef.current.destroy();
+      if (cmRef.current) {
+        cmRef.current.toTextArea();
+        cmRef.current = null;
+      }
     };
   }, [onChange, value]);
 
   useEffect(() => {
-    const view = viewRef.current;
-    if (!view) return;
-    const current = view.state.doc.toString();
+    const cm = cmRef.current;
+    if (!cm) return;
+    const current = cm.getValue();
     if (current !== value) {
-      view.dispatch({
-        changes: { from: 0, to: view.state.doc.length, insert: value || '' },
-      });
+      const cursor = cm.getCursor();
+      cm.setValue(value || '');
+      cm.setCursor(cursor);
     }
   }, [value]);
 
   return (
     <div className="absolute inset-0">
-      <div ref={hostRef} className="h-full w-full" />
-      {!ready && (
-        <textarea
-          className="absolute inset-0 w-full h-full p-4 font-mono text-sm bg-transparent border-none outline-none resize-none text-slate-800 dark:text-slate-200 leading-6"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          spellCheck={false}
-          placeholder="SELECT * FROM orders..."
-        />
-      )}
+      <textarea
+        ref={textareaRef}
+        className="w-full h-full p-4 font-mono text-sm bg-transparent border-none outline-none resize-none text-slate-800 dark:text-slate-200 leading-6"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        spellCheck={false}
+        placeholder="SELECT * FROM orders..."
+        readOnly={ready}
+      />
     </div>
   );
 };
