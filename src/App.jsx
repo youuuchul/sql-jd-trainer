@@ -391,21 +391,6 @@ const SqlEditor = ({ value, onChange }) => {
     };
   }, []);
 
-  // Persist last query per session (debounced)
-  useEffect(() => {
-    if (!currentSessionId || view !== 'workspace') return;
-    const timer = setTimeout(() => {
-      setSessions((prev) => {
-        const updated = prev.map((s) =>
-          s.id === currentSessionId ? { ...s, lastQuery: userQuery } : s
-        );
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-        return updated;
-      });
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [currentSessionId, userQuery, view]);
-
   useEffect(() => {
     const view = viewRef.current;
     if (!view) return;
@@ -563,6 +548,21 @@ export default function App() {
       }
     }
   }, []);
+
+  // Persist last query per session (debounced)
+  useEffect(() => {
+    if (!currentSessionId || view !== 'workspace') return;
+    const timer = setTimeout(() => {
+      setSessions((prev) => {
+        const updated = prev.map((s) =>
+          s.id === currentSessionId ? { ...s, lastQuery: userQuery } : s
+        );
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+        return updated;
+      });
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [currentSessionId, userQuery, view]);
 
   // Check backend availability (MySQL proxy)
   useEffect(() => {
