@@ -361,10 +361,10 @@ const ResultTable = ({ data, error }) => {
   );
 };
 
-const SqlEditor = ({ value, onChange }) => {
-  const hostRef = useRef(null);
-  const viewRef = useRef(null);
-  const [ready, setReady] = useState(false);
+  const SqlEditor = ({ value, onChange }) => {
+    const hostRef = useRef(null);
+    const viewRef = useRef(null);
+    const [ready, setReady] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -380,6 +380,8 @@ const SqlEditor = ({ value, onChange }) => {
           state,
           parent: hostRef.current,
         });
+        // Ensure editor can receive focus/clicks
+        viewRef.current.focus();
         setReady(true);
       } catch (err) {
         console.warn('CodeMirror load failed, fallback to textarea', err);
@@ -389,7 +391,7 @@ const SqlEditor = ({ value, onChange }) => {
       cancelled = true;
       if (viewRef.current) viewRef.current.destroy();
     };
-  }, []);
+  }, [onChange, value]);
 
   useEffect(() => {
     const view = viewRef.current;
