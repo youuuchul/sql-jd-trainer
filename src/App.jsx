@@ -36,7 +36,7 @@ const loadCodeMirror = async () => {
   if (!document.querySelector('link[data-codemirror="base"]')) {
     const link = document.createElement('link');
     link.rel = 'stylesheet';
-    link.href = 'https://cdn.jsdelivr.net/npm/@codemirror/view@6.36.4/dist/style.css';
+    link.href = 'https://unpkg.com/@codemirror/view@6.36.4/dist/style.css';
     link.setAttribute('data-codemirror', 'base');
     document.head.appendChild(link);
   }
@@ -49,12 +49,12 @@ const loadCodeMirror = async () => {
     cmComment,
     cmLanguage,
   ] = await Promise.all([
-    import(/* @vite-ignore */ 'https://cdn.jsdelivr.net/npm/@codemirror/view@6.36.4/dist/index.min.js'),
-    import(/* @vite-ignore */ 'https://cdn.jsdelivr.net/npm/@codemirror/state@6.4.1/dist/index.min.js'),
-    import(/* @vite-ignore */ 'https://cdn.jsdelivr.net/npm/@codemirror/commands@6.3.3/dist/index.min.js'),
-    import(/* @vite-ignore */ 'https://cdn.jsdelivr.net/npm/@codemirror/lang-sql@6.8.0/dist/index.min.js'),
-    import(/* @vite-ignore */ 'https://cdn.jsdelivr.net/npm/@codemirror/comment@6.3.1/dist/index.min.js'),
-    import(/* @vite-ignore */ 'https://cdn.jsdelivr.net/npm/@codemirror/language@6.10.2/dist/index.min.js'),
+    import(/* @vite-ignore */ 'https://esm.sh/@codemirror/view@6.36.4?bundle'),
+    import(/* @vite-ignore */ 'https://esm.sh/@codemirror/state@6.4.1?bundle'),
+    import(/* @vite-ignore */ 'https://esm.sh/@codemirror/commands@6.3.3?bundle'),
+    import(/* @vite-ignore */ 'https://esm.sh/@codemirror/lang-sql@6.8.0?bundle'),
+    import(/* @vite-ignore */ 'https://esm.sh/@codemirror/comment@6.3.1?bundle'),
+    import(/* @vite-ignore */ 'https://esm.sh/@codemirror/language@6.10.2?bundle'),
   ]);
 
   const {
