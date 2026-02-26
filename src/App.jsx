@@ -685,7 +685,15 @@ export default function App() {
   const buildDatabaseFromAnalysis = (result, initialQuery = '') => {
     if (!alasqlRef.current) throw new Error("SQL Engine not loaded yet. Please refresh.");
 
-    alasqlRef.current('CREATE DATABASE IF NOT EXISTS sql_trainer; USE sql_trainer;');
+    try {
+      alasqlRef.current('CREATE DATABASE IF NOT EXISTS sql_trainer; USE sql_trainer;');
+    } catch (err) {
+      // AlaSQL may still throw even with IF NOT EXISTS; ignore only duplicate DB errors
+      const message = String(err?.message || err || '');
+      if (!message.includes('already exists')) {
+        throw err;
+      }
+    }
     result.schema.forEach(table => {
       alasqlRef.current(`DROP TABLE IF EXISTS ${table.tableName}`);
       const colDefs = table.columns.map(c => `${c} STRING`).join(', ');
