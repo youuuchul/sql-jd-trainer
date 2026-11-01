@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { Badge } from "@/components/ui-lab/components/badge/Badge";
-import { DIFFICULTY_LABEL, SOURCE_LABEL, type Problem } from "@/lib/content/types";
+import { DIFFICULTY_LABEL, FORMAT_LABEL, SOURCE_LABEL, type Problem } from "@/lib/content/types";
 
 const DIFF_TONE = { basic: "success", intermediate: "warning", advanced: "danger" } as const;
 
@@ -22,9 +22,9 @@ export function ProblemPanel({ problem, index, total }: { problem: Problem; inde
           <Badge size="sm" tone={DIFF_TONE[problem.difficulty]}>
             {DIFFICULTY_LABEL[problem.difficulty]}
           </Badge>
-          {problem.format === "fix" && (
+          {problem.format !== "write" && (
             <Badge size="sm" tone="warning">
-              깨진 쿼리 고치기
+              {FORMAT_LABEL[problem.format]}
             </Badge>
           )}
           {problem.timeLimitMin && <span className="text-xs text-muted">권장 {problem.timeLimitMin}분</span>}

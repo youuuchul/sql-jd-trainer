@@ -31,6 +31,8 @@ const load = () => {
     const p = ProblemSchema.parse(readJson(file));
     if (!schemas.has(p.schema)) throw new Error(`${file}: unknown schema ${p.schema}`);
     if (p.format !== "mcq" && !p.expected?.rows.length) throw new Error(`${file}: expected 결과가 없습니다. scripts/build-expected.ts 를 먼저 실행하세요.`);
+    if (p.format === "predict" && !p.input?.rows.length) throw new Error(`${file}: predict 문제는 input 표가 필요합니다. scripts/build-expected.ts 를 먼저 실행하세요.`);
+    if (p.format === "spot" && !p.spot?.anomalyRows.length) throw new Error(`${file}: spot 문제는 spot.anomalyRows 가 필요합니다. scripts/build-expected.ts 를 먼저 실행하세요.`);
     problems.set(p.id, p);
   }
   const sets = new Map<string, ProblemSet>();

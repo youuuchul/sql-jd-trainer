@@ -60,8 +60,34 @@ export const WrongPatternSchema = z.object({
 });
 export type WrongPattern = z.infer<typeof WrongPatternSchema>;
 
-export const ProblemFormatSchema = z.enum(["write", "fix", "mcq"]);
+export const ProblemFormatSchema = z.enum(["write", "fix", "mcq", "predict", "spot"]);
 export type ProblemFormat = z.infer<typeof ProblemFormatSchema>;
+export const FORMAT_LABEL: Record<ProblemFormat, string> = {
+  write: "쿼리 작성",
+  fix: "깨진 쿼리 고치기",
+  mcq: "객관식",
+  predict: "출력 예측",
+  spot: "결과 이상 찾기",
+};
+
+/** 출력 예측용 입력 데이터 표. columns/rows는 빌드가 sql.postgres 실행 결과로 채운다. */
+export const InputTableSchema = z.object({
+  title: z.string().default("입력 데이터"),
+  sql: z.partialRecord(DialectSchema, z.string()),
+  columns: z.array(z.string()).default([]),
+  rows: z.array(z.array(CellSchema)).default([]),
+});
+export type InputTable = z.infer<typeof InputTableSchema>;
+
+/** 결과 이상 찾기용 잘못된 쿼리와 그 결과. columns/rows/anomalyRows는 빌드가 채운다. */
+export const SpotSchema = z.object({
+  sql: z.partialRecord(DialectSchema, z.string()),
+  columns: z.array(z.string()).default([]),
+  rows: z.array(z.array(CellSchema)).default([]),
+  /** 정답 결과에 없는 행의 인덱스(0부터) */
+  anomalyRows: z.array(z.number()).default([]),
+});
+export type Spot = z.infer<typeof SpotSchema>;
 
 export const DifficultySchema = z.enum(["basic", "intermediate", "advanced"]);
 export type Difficulty = z.infer<typeof DifficultySchema>;
@@ -95,6 +121,8 @@ export const ProblemSchema = z.object({
   solutions: z.partialRecord(DialectSchema, z.string()).optional(),
   expected: ExpectedSchema.optional(),
   wrongPatterns: z.array(WrongPatternSchema).default([]),
+  input: InputTableSchema.optional(),
+  spot: SpotSchema.optional(),
   explanation: z.string().default(""),
   dialectNotes: z.partialRecord(DialectSchema, z.string()).optional(),
   choices: z

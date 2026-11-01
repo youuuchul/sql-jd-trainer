@@ -1,4 +1,4 @@
-import type { Problem } from "@/lib/content/types";
+import type { Cell, Expected, Problem } from "@/lib/content/types";
 import type { QueryResult } from "@/lib/engine/types";
 import { resultHash, type CompareResult } from "./compare";
 
@@ -8,7 +8,17 @@ export interface Diagnosis {
   source: "pattern" | "rule";
 }
 
-/** 사전 계산한 오답 패턴 해시를 먼저 보고, 없으면 행 수 관계로 규칙 진단을 낸다. */
+/** 컬럼별로 (사용자 값들, 기대 값들) 조건을 만족하는 첫 컬럼 인덱스. 없으면 null. */
+const columnWhere = (result: QueryResult, expected: Expected, pred: (actual: Cell[], expected: Cell[]) => boolean): number | null => {
+  for (let c = 0; c < expected.columns.length; c++) {
+    const a = result.rows.map((r) => r[c]);
+    const e = expected.rows.map((r) => r[c]);
+    if (pred(a, e)) return c;
+  }
+  return null;
+};
+
+/** 사전 계산한 오답 패턴 해시를 먼저 보고, 없으면 컬럼 값과 행 수 관계로 규칙 진단을 낸다. */
 export const diagnose = (problem: Problem, result: QueryResult, cmp: CompareResult): Diagnosis[] => {
   const out: Diagnosis[] = [];
   const hash = resultHash(result);
@@ -22,13 +32,25 @@ export const diagnose = (problem: Problem, result: QueryResult, cmp: CompareResu
     out.push({ label: "출력 컬럼 확인", explanation: "요구한 컬럼 수와 다릅니다. 문제의 출력 형식을 다시 확인하세요.", source: "rule" });
     return out;
   }
+  const expected = problem.expected;
+  if (expected) {
+    const nullCol = columnWhere(result, expected, (a, e) => a.some((v) => v === null) && e.every((v) => v !== null));
+    if (nullCol !== null) {
+      out.push({ label: "NULL 처리", explanation: `${expected.columns[nullCol]} 컬럼에 NULL이 있습니다. LEFT JOIN 뒤 COALESCE 누락, LAG/LEAD 첫 행, 집계 대상이 없는 그룹을 확인하세요.`, source: "rule" });
+    }
+    const intCol = columnWhere(result, expected, (a, e) => e.some((v) => typeof v === "number" && !Number.isInteger(v)) && a.length > 0 && a.every((v) => typeof v === "number" && Number.isInteger(v)));
+    if (intCol !== null) {
+      out.push({ label: "정수 나눗셈 의심", explanation: `${expected.columns[intCol]} 컬럼이 기대와 달리 모두 정수입니다. 정수끼리 나누면 소수점이 버려집니다. 분자나 분모를 numeric/float으로 캐스팅하세요.`, source: "rule" });
+    }
+    if (out.length) return out;
+  }
   if (cmp.mismatches.some((m) => m.kind === "order")) {
     out.push({ label: "정렬 조건", explanation: "값은 맞지만 ORDER BY가 요구 조건과 다릅니다. 정렬 기준과 방향, 동점 처리를 확인하세요.", source: "rule" });
     return out;
   }
   if (expectedRows > 0 && actualRows > expectedRows) {
     const ratio = actualRows / expectedRows;
-    if (Number.isInteger(ratio) && ratio >= 2) {
+    if (expectedRows >= 5 && Number.isInteger(ratio) && ratio >= 2) {
       out.push({ label: "조인 팬아웃 의심", explanation: `결과 행이 기대의 정확히 ${ratio}배입니다. 1:N 관계를 조인한 뒤 집계하거나 DISTINCT 없이 세고 있는지 확인하세요.`, source: "rule" });
     } else {
       out.push({ label: "행이 많음", explanation: "기대보다 행이 많습니다. 필터 조건 누락, 그룹 기준 과다, 중복 행을 의심하세요.", source: "rule" });

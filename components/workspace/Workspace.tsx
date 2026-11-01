@@ -10,9 +10,11 @@ import { renderText } from "@/lib/text";
 import { DialectSelector } from "./DialectSelector";
 import { GradeBanner } from "./GradeBanner";
 import { McqProblem } from "./McqProblem";
+import { PredictProblem } from "./PredictProblem";
 import { ProblemPanel } from "./ProblemPanel";
 import { ResultGrid } from "./ResultGrid";
 import { SchemaPanel } from "./SchemaPanel";
+import { SpotProblem } from "./SpotProblem";
 import { SqlEditor } from "./SqlEditor";
 import { useDesktop } from "./useDesktop";
 import { useEngine } from "./useEngine";
@@ -101,8 +103,20 @@ export function Workspace({ problem, schema, mode = "practice", index, total, on
     </div>
   );
 
+  const special =
+    problem.format === "predict" ? (
+      <PredictProblem problem={problem} dialect={dialect} onDialectChange={setDialect} status={status} execute={execute} mode={mode} onGraded={onGraded} />
+    ) : problem.format === "spot" ? (
+      <SpotProblem problem={problem} dialect={dialect} onDialectChange={setDialect} status={status} mode={mode} onGraded={onGraded} />
+    ) : null;
+
   const editorColumn =
-    problem.format === "mcq" ? null : (
+    problem.format === "mcq" ? null : special ? (
+      <div className="flex flex-col gap-3">
+        {special}
+        {footer}
+      </div>
+    ) : (
       <div className="flex h-full min-h-[32rem] flex-col gap-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <DialectSelector value={dialect} onChange={changeDialect} status={status} />

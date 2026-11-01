@@ -106,6 +106,16 @@ const multisetDiff = (expected: Cell[][], actual: Cell[][], tol: number): { miss
   return { missing, extra };
 };
 
+/** actual 행 중 expected 다중집합에 없는 행의 인덱스. */
+export const multisetExtraIndexes = (expected: Cell[][], actual: Cell[][], tol: number): number[] => {
+  const used = new Array<boolean>(actual.length).fill(false);
+  for (const e of expected) {
+    const i = actual.findIndex((a, idx) => !used[idx] && rowEqual(e, a, tol));
+    if (i !== -1) used[i] = true;
+  }
+  return actual.map((_, i) => i).filter((i) => !used[i]);
+};
+
 /** 오답 패턴 대조용. 정규화한 행을 정렬해 해시한다. */
 export const resultHash = (result: { columns: string[]; rows: Cell[][] }): string => {
   const lines = result.rows.map((r) => r.map((v) => JSON.stringify(normalizeCell(v))).join("\u0001")).sort();

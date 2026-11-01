@@ -6,7 +6,7 @@
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { ProblemSchema, SchemaDefSchema, type Problem, type SchemaDef } from "../lib/content/types";
-import { compareResult, resultHash } from "../lib/grading/compare";
+import { compareResult, multisetExtraIndexes, resultHash } from "../lib/grading/compare";
 import type { QueryResult } from "../lib/engine/types";
 import { createDuckdbNode } from "./duckdb-node";
 import { createMysqlNode } from "./mysql-node";
@@ -122,7 +122,62 @@ const main = async () => {
       wrongPatterns.push({ ...wp, resultHash: h });
     }
 
-    const out = { ...raw, expected, wrongPatterns };
+    let input = raw.input;
+    if (problem.input) {
+      const res = await run("postgres", problem.input.sql.postgres ?? "");
+      if (res instanceof Error) {
+        failures++;
+        line.push(`입력 표 실행 실패: ${res.message.split("\n")[0].slice(0, 80)}`);
+      } else {
+        input = { ...raw.input, columns: res.columns, rows: res.rows };
+        line.push(`입력 ${res.rows.length}행`);
+        if (res.rows.length === 0 || res.rows.length > 30) {
+          failures++;
+          line.push("경고: 입력 표는 1~30행이어야 합니다");
+        }
+      }
+    }
+
+    let spot = raw.spot;
+    if (problem.spot) {
+      const res = await run("postgres", problem.spot.sql.postgres ?? "");
+      if (res instanceof Error) {
+        failures++;
+        line.push(`spot 쿼리 실행 실패: ${res.message.split("\n")[0].slice(0, 80)}`);
+      } else {
+        const cmp = compareResult({ ...expected, ordered: false }, res);
+        const extraKeys = new Set(multisetExtraIndexes(expected.rows, res.rows, expected.tolerance));
+        const anomalyRows = res.rows.map((_, i) => i).filter((i) => extraKeys.has(i));
+        spot = { ...raw.spot, columns: res.columns, rows: res.rows, anomalyRows };
+        line.push(`spot ${res.rows.length}행 이상 ${anomalyRows.length}행`);
+        if (cmp.pass || anomalyRows.length === 0) {
+          failures++;
+          line.push("경고: spot 쿼리 결과에 정답과 다른 행이 없습니다");
+        }
+        if (res.rows.length > 40) {
+          failures++;
+          line.push("경고: spot 결과는 40행 이하여야 합니다");
+        }
+        for (const dialect of ["bigquery", "mysql"] as const) {
+          const sql = problem.spot.sql[dialect];
+          if (!sql) continue;
+          if (dialect === "mysql" && !mysql) continue;
+          const other = await run(dialect, sql);
+          if (other instanceof Error) {
+            failures++;
+            line.push(`spot ${dialect} 실패: ${other.message.split("\n")[0].slice(0, 80)}`);
+            continue;
+          }
+          const same = compareResult({ columns: res.columns, rows: res.rows, ordered: true, tolerance: expected.tolerance, checkColumnNames: false }, other);
+          if (!same.pass) {
+            failures++;
+            line.push(`spot ${dialect} 결과가 PG와 다름(행 순서 포함): ${same.mismatches.map((m) => m.message).join(" / ")}`);
+          }
+        }
+      }
+    }
+
+    const out = { ...raw, expected, wrongPatterns, ...(input ? { input } : {}), ...(spot ? { spot } : {}) };
     writeFileSync(file, JSON.stringify(out, null, 2) + "\n");
     summary.push(line.join(" | "));
   }

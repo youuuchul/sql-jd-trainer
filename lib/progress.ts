@@ -8,6 +8,10 @@ export interface ProblemProgress {
   sql: Partial<Record<Dialect, string>>;
   passedAt?: string;
   mcqAnswer?: string[];
+  /** 출력 예측 입력 텍스트 */
+  predictAnswer?: string;
+  /** 결과 이상 찾기에서 고른 행 인덱스 */
+  spotRows?: number[];
 }
 
 type Store = Record<string, ProblemProgress>;

@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { Badge } from "@/components/ui-lab/components/badge/Badge";
-import { DIFFICULTY_LABEL, SOURCE_LABEL, type Problem } from "@/lib/content/types";
+import { DIFFICULTY_LABEL, FORMAT_LABEL, SOURCE_LABEL, type Problem } from "@/lib/content/types";
 import { useProgressStore } from "@/lib/progress";
 
 const DIFF_TONE = { basic: "success", intermediate: "warning", advanced: "danger" } as const;
@@ -20,6 +20,7 @@ export function ProblemList({ problems }: { problems: Problem[] }) {
                 <p className="truncate text-[14px] font-medium">{p.title}</p>
                 <p className="mt-0.5 flex flex-wrap gap-x-2 text-xs text-muted">
                   <span>{SOURCE_LABEL[p.sourceType]}</span>
+                  {p.format !== "write" && <span className="text-warn">{FORMAT_LABEL[p.format]}</span>}
                   {p.tags.slice(0, 3).map((t) => (
                     <span key={t}>{t}</span>
                   ))}

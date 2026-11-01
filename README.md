@@ -6,8 +6,9 @@
 
 ## 기능
 
-- 문제 세트: 연습 세트(20문제)와 타이머가 있는 모의 시험 세트(6문제)
-- 문제 형식: 쿼리 작성, 깨진 쿼리 고치기(시작 쿼리 제공), 객관식
+- 문제 세트: 연습 세트(20문제), 학습 포맷 드릴(9문제), 타이머가 있는 모의 시험 세트(6문제)
+- 문제 형식: 쿼리 작성, 깨진 쿼리 고치기(시작 쿼리 제공), 객관식, 출력 예측(입력 표와 쿼리를 보고 결과 입력), 결과 이상 찾기(잘못된 쿼리 결과에서 틀린 행 선택)
+- 오답 진단: 문제별 오답 패턴 해시(문제당 2~3개)를 먼저 대조하고, 없으면 NULL·정수 나눗셈·정렬·행 수 규칙으로 라벨을 낸다
 - 실행 엔진
   - PostgreSQL: PGlite(브라우저 WASM)
   - BigQuery: DuckDB-WASM + BigQuery 방언 변환(`lib/engine/bq-shim.ts`)
@@ -48,6 +49,7 @@ content/sets/*.json             세트 구성 (practice | mock)
 ```bash
 npx tsx scripts/gen-schema.ts                    # 시드 재생성
 MYSQL_URL=... npx tsx scripts/build-expected.ts  # 전체. 뒤에 문제 ID 접두사를 주면 일부만
+npx tsx scripts/eval-diagnose.ts                 # 오답 진단 적중률(content/eval/wrong-queries.json, 목표 80%)
 ```
 
 ## 검증
