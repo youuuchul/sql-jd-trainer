@@ -1,0 +1,48 @@
+@import "tailwindcss";
+@import "../styles/ui-lab-tokens.css";
+
+@theme {
+  /* 프로젝트 확장 토큰 */
+  --color-surface-2: #222222;
+  --color-pass: #4ade80;
+  --color-fail: #f87171;
+  --color-warn: #fbbf24;
+  --color-dialect-pg: #7cc4ff;
+  --color-dialect-bq: #8fd3a1;
+  --color-dialect-my: #f6b26b;
+  --color-diff-missing: #fbbf24;
+  --color-diff-extra: #f87171;
+  --color-syntax-keyword: #c792ea;
+  --color-syntax-string: #c3e88d;
+  --color-syntax-number: #f78c6c;
+  --color-syntax-comment: #6f7787;
+  --color-syntax-function: #82aaff;
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+  font-feature-settings: "tnum";
+}
+body {
+  margin: 0;
+  word-break: keep-all;
+  min-height: 100vh;
+}
+::selection {
+  background: color-mix(in srgb, var(--color-accent) 40%, transparent);
+}
+.cm-editor {
+  height: 100%;
+  font-family: var(--font-mono);
+  font-size: 13.5px;
+}
+.cm-editor.cm-focused {
+  outline: none;
+}
+.cm-scroller {
+  font-family: var(--font-mono) !important;
+  line-height: 1.6;
+}
