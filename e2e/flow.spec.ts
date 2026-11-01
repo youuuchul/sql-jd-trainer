@@ -26,7 +26,8 @@ test("문제 풀이 흐름: PostgreSQL 정답·오답 진단·BigQuery·MySQL·�
   // PostgreSQL (PGlite) 정답
   await waitReady(page);
   await setEditor(page, e01.solutions.postgres);
-  await page.getByRole("button", { name: /실행/ }).click();
+  // 실행 단축키(Cmd/Ctrl+Enter)로 실행
+  await page.keyboard.press(process.platform === "darwin" ? "Meta+Enter" : "Control+Enter");
   await expect(page.getByText("정답", { exact: true })).toBeVisible();
   await expect(page.getByText(/내 결과 8행/)).toBeVisible();
   await expect(page.getByRole("heading", { name: "해설" })).toBeVisible();

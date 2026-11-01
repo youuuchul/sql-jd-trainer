@@ -1,5 +1,5 @@
 "use client";
-import CodeMirror, { EditorView, keymap, type Extension } from "@uiw/react-codemirror";
+import CodeMirror, { EditorView, keymap, Prec, type Extension } from "@uiw/react-codemirror";
 import { MySQL, PostgreSQL, StandardSQL, sql } from "@codemirror/lang-sql";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { tags as t } from "@lezer/highlight";
@@ -49,7 +49,7 @@ export function SqlEditor({ value, onChange, dialect, onRun, readOnly = false }:
       sql({ dialect: DIALECT_MAP[dialect], upperCaseKeywords: true }),
       theme,
       syntaxHighlighting(highlight),
-      keymap.of([{ key: "Mod-Enter", run: () => (onRun?.(), true) }]),
+      Prec.highest(keymap.of([{ key: "Mod-Enter", run: () => (onRun?.(), true) }])),
       EditorView.lineWrapping,
     ],
     [dialect, onRun],
