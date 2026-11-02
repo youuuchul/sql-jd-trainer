@@ -141,3 +141,29 @@ test("결과 이상 찾기: 행 선택 채점", async ({ page }) => {
   await page.reload();
   await expect(page.getByRole("checkbox", { name: `${anomalies[0] + 1}번째 행 선택` })).toBeChecked();
 });
+
+test("공고 분석: 역량 태그와 추천 문제, 새로고침 후 유지", async ({ page }) => {
+  await page.goto("/jd");
+  const box = page.getByRole("textbox", { name: "채용 공고" });
+  await expect(page.getByRole("button", { name: "분석" })).toBeDisabled();
+  await box.fill("앱 이벤트 로그로 퍼널 전환율을 분석하고 A/B 테스트로 검증합니다. 데이터 정합성을 검증합니다.");
+  await page.getByRole("button", { name: "분석" }).click();
+  const skills = page.getByRole("list").filter({ hasText: "퍼널 분석" }).first();
+  await expect(skills.getByText("퍼널 분석")).toBeVisible();
+  await expect(skills.getByText("A/B 테스트와 실험")).toBeVisible();
+  await expect(skills.getByText("정합성과 데이터 품질 검증")).toBeVisible();
+  const funnel = page.getByRole("link", { name: /(비공개)/ });
+  await expect(funnel).toBeVisible();
+  await expect(funnel.getByText("퍼널 분석")).toBeVisible();
+  await page.reload();
+  await expect(box).toHaveValue(/퍼널 전환율/);
+  await expect(funnel).toBeVisible();
+  await box.fill("점심 메뉴를 알려주세요.");
+  await page.getByRole("button", { name: "분석" }).click();
+  await expect(page.getByText("SQL 역량 키워드를 찾지 못했습니다")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "추천 문제" })).toHaveCount(0);
+  await box.fill("퍼널 전환율 분석");
+  await page.getByRole("button", { name: "분석" }).click();
+  await funnel.click();
+  await expect(page).toHaveURL(/\/problems\/e02-sales-funnel-sequential/);
+});

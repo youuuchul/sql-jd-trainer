@@ -16,6 +16,7 @@
 - 채점: 정답 결과 집합과 비교(순서·허용 오차·NULL 정규화). 미리 계산한 오답 패턴 해시와 행 수 규칙으로 원인을 진단
 - 해설: 결과 · 조회 기준 · 인사이트 구조, 방언별 정답 쿼리와 메모, 자주 나오는 오답
 - 진행 상태: 방언별 마지막 쿼리와 통과 여부를 localStorage에 저장
+- 공고 분석(`/jd`): 채용 공고 본문을 붙여넣으면 역량 키워드 사전(`content/jd/competencies.json`)으로 요구 역량을 찾고, 문제 태그와 겹치는 문제를 추천한다. AI 호출 없음
 
 ## 개발
 
@@ -42,7 +43,10 @@ MYSQL_URL='mysql://root:sjt@127.0.0.1:3307/' npm run dev
 content/schemas/<id>.json      방언 중립 시드 (scripts/gen-schema.ts 가 생성)
 content/problems/<group>/*.json 문제 본문, 방언별 정답, 기대 결과, 오답 패턴, 해설
 content/sets/*.json             세트 구성 (practice | mock)
+content/jd/competencies.json    공고 분석용 역량 사전 (keywords -> problemTags)
 ```
+
+문제의 `tags`는 공고 분석 추천의 근거가 된다. 새 태그를 만들면 역량 사전의 `problemTags`에도 넣을지 검토한다.
 
 정답 쿼리를 바꾸거나 문제를 추가하면 기대 결과를 다시 만든다. 세 방언의 결과가 같은지, 오답 패턴이 정답과 구분되는지 함께 검사한다.
 
@@ -50,6 +54,7 @@ content/sets/*.json             세트 구성 (practice | mock)
 npx tsx scripts/gen-schema.ts                    # 시드 재생성
 MYSQL_URL=... npx tsx scripts/build-expected.ts  # 전체. 뒤에 문제 ID 접두사를 주면 일부만
 npx tsx scripts/eval-diagnose.ts                 # 오답 진단 적중률(content/eval/wrong-queries.json, 목표 80%)
+npx tsx scripts/eval-jd.ts                       # 공고 역량 매핑 평가(content/eval/jd-samples.json, 전부 통과해야 함)
 ```
 
 ## 검증

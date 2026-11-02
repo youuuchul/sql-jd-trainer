@@ -1,0 +1,47 @@
+{
+  "description": "JD 역량 매핑 평가용 샘플. docs/research/02-jd-corpus 의 공고를 바꿔 쓴 가상 문장이며, expected는 반드시 잡혀야 할 역량 id, unexpected는 잡히면 안 되는 역량 id다. 기준: expected 전부 검출, unexpected 0건, 추천 문제 1개 이상.",
+  "items": [
+    {
+      "id": "bank-da",
+      "note": "인터넷은행 DA. 정합성·마트·실험",
+      "text": "주요 업무\n- 문제 정의와 가설 수립, A/B 테스트와 인과추론으로 검증합니다.\n- 재사용 가능한 데이터 마트를 설계하고 정합성을 검증합니다.\n자격 요건\n- 복잡한 비즈니스 로직을 정합성 있는 SQL로 구현할 수 있는 분\n- Impala, Tableau 사용 경험",
+      "expected": ["ab-test", "data-mart", "data-quality", "complex-logic"],
+      "unexpected": ["funnel", "cohort-retention", "segment-ltv"]
+    },
+    {
+      "id": "payment-da",
+      "note": "결제 DA. 결제·정산·지표",
+      "text": "가맹점 결제·정산 데이터로 지표 체계를 설계하고 운영합니다. 취소·환불이 반영된 매출 지표를 정의하고, 원천 데이터를 정제해 마트로 적재합니다.",
+      "expected": ["payment-domain", "metric-design", "data-mart"],
+      "unexpected": ["ab-test", "funnel", "segment-ltv", "window-functions"]
+    },
+    {
+      "id": "commerce-growth",
+      "note": "커머스 그로스. 퍼널·코호트·리텐션",
+      "text": "담당 업무: 앱 이벤트 로그 기반 퍼널 전환율 분석, 가입 코호트별 리텐션 추적, 이탈 사용자 세그먼트 정의. Amplitude와 BigQuery를 사용합니다.",
+      "expected": ["funnel", "cohort-retention", "event-log", "segment-ltv"],
+      "unexpected": ["payment-domain", "data-mart", "ab-test"]
+    },
+    {
+      "id": "senior-analytics",
+      "note": "시니어. 윈도우·LTV·활성 지표",
+      "text": "요구 역량: 윈도우 함수와 CTE를 활용한 고급 SQL, 고객 LTV 추정과 상위 고객 분석, MAU/DAU 등 활성 사용자 지표 운영. 쿼리 성능 튜닝 우대.",
+      "expected": ["window-functions", "segment-ltv", "active-users", "metric-design", "complex-logic"],
+      "unexpected": ["funnel", "payment-domain", "ab-test"]
+    },
+    {
+      "id": "ops-analyst",
+      "note": "운영 분석. 가독성·표준화",
+      "text": "지표 정의서를 작성하고 분석가 간 쿼리를 표준화합니다. 가독성 높은 쿼리 작성과 코드 리뷰 문화를 중요하게 생각합니다.",
+      "expected": ["query-quality", "metric-design"],
+      "unexpected": ["ab-test", "funnel", "cohort-retention", "payment-domain", "window-functions"]
+    },
+    {
+      "id": "no-sql-content",
+      "note": "SQL과 무관한 문장. 아무 역량도 잡히지 않아야 함",
+      "text": "안녕하세요. 회의는 오후 세 시에 시작합니다. 점심 메뉴를 알려주세요.",
+      "expected": [],
+      "unexpected": ["metric-design", "data-quality", "complex-logic", "data-mart", "ab-test", "funnel", "cohort-retention", "event-log", "payment-domain", "window-functions", "segment-ltv", "active-users", "query-quality"]
+    }
+  ]
+}

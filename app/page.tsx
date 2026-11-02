@@ -11,6 +11,9 @@ export default function HomePage() {
         <p className="mt-3 text-[15px] leading-relaxed text-fg/80">
           실무 마트 구조에서 지표를 정의하고 쿼리로 구현합니다. PostgreSQL, BigQuery, MySQL 중 하나를 골라 브라우저에서 바로 실행하고, 결과 집합 비교로 즉시 채점됩니다.
         </p>
+        <Link href="/jd" className="mt-4 inline-flex h-9 items-center rounded-lg bg-fg/10 px-3 text-sm font-medium hover:bg-fg/15">
+          채용 공고로 문제 고르기
+        </Link>
       </div>
       <ul className="mt-10 grid gap-4 sm:grid-cols-2">
         {sets.map((s) => {

@@ -2,11 +2,14 @@
 import Link from "next/link";
 import { Badge } from "@/components/ui-lab/components/badge/Badge";
 import { DIFFICULTY_LABEL, FORMAT_LABEL, SOURCE_LABEL, type Problem } from "@/lib/content/types";
+
+type ListItem = Pick<Problem, "id" | "title" | "difficulty" | "format" | "sourceType" | "tags">;
 import { useProgressStore } from "@/lib/progress";
 
 const DIFF_TONE = { basic: "success", intermediate: "warning", advanced: "danger" } as const;
 
-export function ProblemList({ problems }: { problems: Problem[] }) {
+/** reasons: 문제별로 태그 대신 보여줄 추천 근거 */
+export function ProblemList({ problems, reasons }: { problems: ListItem[]; reasons?: Record<string, string[]> }) {
   const store = useProgressStore();
   return (
     <ol className="divide-y divide-line rounded-card border border-line bg-surface">
@@ -21,8 +24,10 @@ export function ProblemList({ problems }: { problems: Problem[] }) {
                 <p className="mt-0.5 flex flex-wrap gap-x-2 text-xs text-muted">
                   <span>{SOURCE_LABEL[p.sourceType]}</span>
                   {p.format !== "write" && <span className="text-warn">{FORMAT_LABEL[p.format]}</span>}
-                  {p.tags.slice(0, 3).map((t) => (
-                    <span key={t}>{t}</span>
+                  {(reasons?.[p.id] ?? p.tags.slice(0, 3)).map((t) => (
+                    <span key={t} className={reasons ? "text-accent" : undefined}>
+                      {t}
+                    </span>
                   ))}
                 </p>
               </div>

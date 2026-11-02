@@ -30,6 +30,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               <Link href="/mock/archive-mock" className="rounded-lg px-3 py-1.5 hover:bg-fg/10 hover:text-fg">
                 모의 시험
               </Link>
+              <Link href="/jd" className="rounded-lg px-3 py-1.5 hover:bg-fg/10 hover:text-fg">
+                공고 분석
+              </Link>
             </nav>
           </div>
         </header>

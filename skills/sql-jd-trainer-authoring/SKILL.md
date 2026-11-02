@@ -30,5 +30,6 @@ MYSQL_URL='mysql://root:sjt@127.0.0.1:3307/' npx tsx scripts/build-expected.ts <
 ```
 - 세 방언 모두 "일치"여야 한다. "정답과 같은 결과" 경고가 뜨면 오답 패턴이 데이터에서 구분되지 않는 것이다. 패턴을 바꾸거나 시드에 함정 행을 추가한다.
 - 로컬 MySQL은 README의 docker 명령으로 띄운다.
+- 공고 역량 매핑: `npx tsx scripts/eval-jd.ts`. content/jd/competencies.json 의 problemTags 는 실제 문제 tags 와 겹쳐야 하며, content/eval/jd-samples.json 의 expected/unexpected 역량이 모두 맞아야 한다. 문제 tags 를 새로 만들면 역량 사전에 넣을지 검토한다.
 - 오답 진단 적중률: `npx tsx scripts/eval-diagnose.ts`. content/eval/wrong-queries.json 에 wrongPatterns와 다른 형태로 같은 실수를 저지른 쿼리와 기대 라벨을 둔다. 목표 80% 이상.
 - UI 확인은 `npx next dev -p 3100` 후 `npx playwright test`.

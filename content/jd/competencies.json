@@ -1,0 +1,96 @@
+{
+  "description": "JD 텍스트를 역량으로 태그화하는 키워드 사전. keywords는 공백·대소문자를 무시하고 부분 일치로 찾고, problemTags는 문제 tags와 교집합이 있으면 추천한다. 빈도는 분석직 공고 23건 기준.",
+  "items": [
+    {
+      "id": "metric-design",
+      "label": "지표 정의와 설계",
+      "frequency": "57%",
+      "keywords": ["지표", "KPI", "메트릭", "metric", "북극성", "OKR"],
+      "problemTags": ["지표 정의", "분모 정의", "비율 계산", "집계"]
+    },
+    {
+      "id": "data-quality",
+      "label": "정합성과 데이터 품질 검증",
+      "frequency": "30%",
+      "keywords": ["정합성", "데이터 품질", "자기검증", "자기 검증", "검증", "data quality", "신뢰할 수 있는"],
+      "problemTags": ["정합성 검증", "결과 이상 찾기", "NULL 처리", "NULL", "조인 팬아웃", "조인 다중성", "날짜 경계"]
+    },
+    {
+      "id": "complex-logic",
+      "label": "복잡한 비즈니스 로직 구현",
+      "frequency": "13%",
+      "keywords": ["복잡한 비즈니스 로직", "비즈니스 로직", "복잡한 쿼리", "고급 SQL", "advanced SQL", "복잡한 조건"],
+      "problemTags": ["윈도우 함수", "gaps and islands", "구간 조인", "셀프 조인", "CTE", "순차 조건", "양방향 관계"]
+    },
+    {
+      "id": "data-mart",
+      "label": "데이터 마트 설계",
+      "frequency": "30%",
+      "keywords": ["마트", "mart", "집계 테이블", "모델링", "modeling", "ETL", "ELT", "적재", "파이프라인"],
+      "problemTags": ["집계", "집계 후 조인", "조인 다중성", "피벗", "누적 집계", "정합성 검증"]
+    },
+    {
+      "id": "ab-test",
+      "label": "A/B 테스트와 실험",
+      "frequency": "61%",
+      "keywords": ["A/B", "AB 테스트", "AB테스트", "A/B test", "ABtest", "실험", "experiment", "인과추론", "인과 추론", "causal"],
+      "problemTags": ["A/B 테스트", "실험 설계", "편향", "그룹 비교"]
+    },
+    {
+      "id": "funnel",
+      "label": "퍼널 분석",
+      "frequency": "17%",
+      "keywords": ["퍼널", "funnel", "전환율", "전환 분석", "전환 단계", "conversion"],
+      "problemTags": ["퍼널", "순차 조건", "조건부 집계", "날짜 차이"]
+    },
+    {
+      "id": "cohort-retention",
+      "label": "코호트와 리텐션",
+      "frequency": "17%",
+      "keywords": ["코호트", "cohort", "리텐션", "retention", "잔존", "재방문", "재구매", "이탈"],
+      "problemTags": ["코호트", "리텐션", "anti-join", "NOT EXISTS", "누적 집계"]
+    },
+    {
+      "id": "event-log",
+      "label": "이벤트 로그 분석",
+      "frequency": "9%",
+      "keywords": ["로그", "log", "이벤트", "event", "행동 데이터", "유저 행동", "사용자 행동", "Amplitude", "Mixpanel"],
+      "problemTags": ["퍼널", "순차 조건", "윈도우 함수", "ROW_NUMBER", "gaps and islands"]
+    },
+    {
+      "id": "payment-domain",
+      "label": "결제와 정산 데이터",
+      "frequency": "결제 도메인 공고 공통",
+      "keywords": ["결제", "거래", "정산", "취소", "환불", "매출", "수수료", "가맹점", "payment", "transaction", "금융"],
+      "problemTags": ["취소 귀속", "취소 결제", "정합성 검증", "구간 조인", "COALESCE", "MIN"]
+    },
+    {
+      "id": "window-functions",
+      "label": "윈도우 함수와 고급 집계",
+      "frequency": "복잡 로직의 전제 수단",
+      "keywords": ["윈도우", "window", "랭킹", "ranking", "순위", "누적", "이동평균", "이동 평균", "최근 N", "세션"],
+      "problemTags": ["윈도우 함수", "ROW_NUMBER", "RANK", "윈도우 프레임", "이동평균", "누적합", "LAG", "COUNT OVER", "동점 처리"]
+    },
+    {
+      "id": "segment-ltv",
+      "label": "세그먼트와 LTV",
+      "frequency": "9%",
+      "keywords": ["LTV", "CLV", "생애가치", "생애 가치", "세그먼트", "segment", "상위 고객", "VIP", "분위"],
+      "problemTags": ["NTILE", "분위수", "누적합", "그룹 비교", "코호트"]
+    },
+    {
+      "id": "active-users",
+      "label": "활성 사용자와 이탈 지표",
+      "frequency": "지표 설계 공고 공통",
+      "keywords": ["MAU", "DAU", "WAU", "활성 사용자", "활성 유저", "액티브", "active user", "이탈", "churn"],
+      "problemTags": ["지표 정의", "COUNT DISTINCT", "누적 집계", "anti-join", "날짜 경계"]
+    },
+    {
+      "id": "query-quality",
+      "label": "가독성 있는 쿼리와 표준화",
+      "frequency": "9%",
+      "keywords": ["가독성", "표준화", "쿼리 리뷰", "코드 리뷰", "재사용", "유지보수", "readable"],
+      "problemTags": ["깨진 쿼리 고치기", "CTE", "출력 예측", "WHERE vs ON", "NOT IN"]
+    }
+  ]
+}
