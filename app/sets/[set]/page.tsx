@@ -4,20 +4,20 @@ import { LockGate } from "@/components/LockGate";
 import { ProblemList } from "@/components/ProblemList";
 import { Badge } from "@/components/ui-lab/components/badge/Badge";
 import { getSchema, getSet, listSets, setProblems } from "@/lib/content/loader";
-import type { ProblemSet, SchemaDef } from "@/lib/content/types";
+import type { Problem, ProblemSet, SchemaDef } from "@/lib/content/types";
 
-export const generateStaticParams = () => listSets().map((s) => ({ set: s.id }));
+export const generateStaticParams = async () => (await listSets()).map((s) => ({ set: s.id }));
 
 export default async function SetPage({ params }: PageProps<"/sets/[set]">) {
   const { set: setId } = await params;
-  const set = getSet(setId);
+  const set = await getSet(setId);
   if (!set) notFound();
-  const schema = getSchema(set.schema);
-  return <LockGate locked={schema?.locked ?? false} title={set.title} render={() => <SetView set={set} schema={schema} />} />;
+  const schema = await getSchema(set.schema);
+  const problems = await setProblems(set);
+  return <LockGate locked={schema?.locked ?? false} title={set.title} render={() => <SetView set={set} schema={schema} problems={problems} />} />;
 }
 
-function SetView({ set, schema }: { set: ProblemSet; schema: SchemaDef | undefined }) {
-  const problems = setProblems(set);
+function SetView({ set, schema, problems }: { set: ProblemSet; schema: SchemaDef | undefined; problems: Problem[] }) {
   return (
     <div className="mx-auto w-full max-w-3xl px-5 py-10">
       <Link href="/" className="text-xs text-muted hover:text-fg">

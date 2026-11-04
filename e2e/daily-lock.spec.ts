@@ -2,24 +2,28 @@ import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { devices, expect, test } from "@playwright/test";
 import type { Card } from "../lib/content/types";
+import { problem, set } from "./content";
 
 const DIR = "content/cards";
 const cards: Card[] = readdirSync(DIR).flatMap((f) => (JSON.parse(readFileSync(path.join(DIR, f), "utf-8")) as { cards: Card[] }).cards);
 const byPrompt = new Map(cards.map((c) => [c.prompt, c]));
 
-test("홈: 분류 순서와 잠긴 비공개 세트 표시", async ({ page }) => {
+test("홈: 분류 순서와 잠긴 세트 표시", async ({ page }) => {
   await page.goto("/");
   await expect(page.locator("section > h2")).toHaveText(["기초 문법", "직무별 실무", "KPI 대시보드", "비공개 복습 아카이브"]);
   await expect(page.getByLabel("잠김")).toHaveCount(3);
 });
 
 test("잠금: 비밀번호 전에는 문제가 보이지 않고, 틀린 비밀번호는 거절, 맞으면 세트와 문제가 열린다", async ({ page }) => {
-  await page.goto("/sets/archive-practice");
+  const archive = set("archive-practice");
+  const first = problem(archive.problems[0]);
+  const promptHead = first.prompt.slice(0, 12);
+  await page.goto(`/sets/${archive.id}`);
   await expect(page.getByPlaceholder("비밀번호")).toBeVisible();
   await expect(page.locator('a[href^="/problems/"]')).toHaveCount(0);
-  await page.goto("/problems/e01-conversion-days");
+  await page.goto(`/problems/${first.id}`);
   await expect(page.getByPlaceholder("비밀번호")).toBeVisible();
-  await expect(page.getByText("(비공개)")).toHaveCount(0);
+  await expect(page.getByText(promptHead)).toHaveCount(0);
 
   await page.getByPlaceholder("비밀번호").fill("0000");
   await page.getByRole("button", { name: "열기" }).click();
@@ -27,9 +31,9 @@ test("잠금: 비밀번호 전에는 문제가 보이지 않고, 틀린 비밀�
 
   await page.getByPlaceholder("비밀번호").fill(process.env.UNLOCK_PASSWORD ?? "");
   await page.getByRole("button", { name: "열기" }).click();
-  await expect(page.getByText("(비공개)").first()).toBeVisible();
-  await page.goto("/sets/archive-practice");
-  await expect(page.locator('a[href^="/problems/"]')).toHaveCount(20);
+  await expect(page.getByText(promptHead).first()).toBeVisible();
+  await page.goto(`/sets/${archive.id}`);
+  await expect(page.locator('a[href^="/problems/"]')).toHaveCount(archive.problems.length);
 });
 
 test.describe("하루 카드 (모바일)", () => {

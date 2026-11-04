@@ -6,7 +6,8 @@ description: SQL JD Trainer 문제·시드 작성과 검증 절차 (content JSON
 # 문제 작성과 검증
 
 ## 구조
-- `content/schemas/<id>.json`: 방언 중립 시드. 직접 고치지 말고 생성기를 고친 뒤 다시 만든다. 비공개 세트는 `scripts/gen-schema.ts`, 나머지는 스키마마다 `scripts/gen-schema-<id>.ts`(공용 유틸 `scripts/seed-utils.ts`). 전체 3,000행 안쪽. `locked: true` 면 비밀번호 뒤로 간다.
+- 콘텐츠(`content/problems`, `sets`, `schemas`, `cards`, `generators`)는 저장소에 두지 않는다. 로컬에서 작성·검증하고 `scripts/publish-content.ts` 로 운영 DB 에 게시한다.
+- `content/schemas/<id>.json`: 방언 중립 시드. 직접 고치지 말고 생성기 `content/generators/gen-schema-<id>.ts`(공용 유틸 `scripts/seed-utils.ts`)를 고친 뒤 다시 만든다. 전체 3,000행 안쪽. `locked: true` 면 비밀번호 뒤로 간다.
 - `content/problems/<group>/<id>.json`: 아래 키를 채운다.
   - id, schema, title, sourceType(expected|domain|jd), format(write|fix|mcq|predict|spot), difficulty(basic|intermediate|advanced), tags
   - prompt, requirements[], hints[], timeLimitMin
@@ -39,4 +40,5 @@ MYSQL_URL='mysql://root:sjt@127.0.0.1:3307/' npx tsx scripts/build-expected.ts <
 - 오답 진단 적중률: `npx tsx scripts/eval-diagnose.ts`. content/eval/wrong-queries.json 에 wrongPatterns와 다른 형태로 같은 실수를 저지른 쿼리와 기대 라벨을 둔다. 목표 80% 이상.
 - 카드: `MYSQL_URL=... npx tsx scripts/build-cards.ts` 가 "모두 통과 (N장)".
 - 여러 스키마를 한 번에 돌릴 때는 접두사를 여러 개 준다: `build-expected.ts ba bb ja jb k-`. 파일명 접두사로 거르므로 작업 중인 다른 파일을 건드리지 않는다.
+- 게시: `npx tsx scripts/publish-content.ts --dry-run` 으로 검증한 뒤 `--revalidate https://sql-jd-trainer.vercel.app` 로 DB 반영과 캐시 무효화. 로컬 dev 도 같은 DB 를 읽으므로 화면 확인 전에 게시한다.
 - UI 확인은 `npx next dev -p 3100` 후 `npx playwright test`. 새 스키마는 `e2e/schemas.spec.ts` 가 자동으로 한 문제씩 브라우저에서 채점한다.

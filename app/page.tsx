@@ -1,11 +1,12 @@
 import { Lock } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui-lab/components/badge/Badge";
-import { getSchema, listSets, setProblems } from "@/lib/content/loader";
+import { listSchemas, listSets } from "@/lib/content/loader";
 import { SET_CATEGORY_LABEL, SetCategorySchema } from "@/lib/content/types";
 
-export default function HomePage() {
-  const sets = listSets();
+export default async function HomePage() {
+  const [sets, schemas] = await Promise.all([listSets(), listSchemas()]);
+  const lockedSchemas = new Set(schemas.filter((s) => s.locked).map((s) => s.id));
   const groups = SetCategorySchema.options
     .map((category) => ({ category, sets: sets.filter((s) => s.category === category).sort((a, b) => a.order - b.order) }))
     .filter((g) => g.sets.length);
@@ -30,15 +31,14 @@ export default function HomePage() {
           <h2 className="text-sm font-semibold text-muted">{SET_CATEGORY_LABEL[g.category]}</h2>
           <ul className="mt-3 grid gap-4 sm:grid-cols-2">
             {g.sets.map((s) => {
-              const problems = setProblems(s);
-              const locked = getSchema(s.schema)?.locked ?? false;
+              const locked = lockedSchemas.has(s.schema);
               return (
                 <li key={s.id} className="flex flex-col rounded-card border border-line bg-surface p-5">
                   <div className="flex items-center gap-2">
                     <Badge size="sm" tone={s.mode === "mock" ? "accent" : "neutral"}>
                       {s.mode === "mock" ? "모의 시험" : "연습"}
                     </Badge>
-                    <span className="text-xs text-muted">{problems.length}문제</span>
+                    <span className="text-xs text-muted">{s.problems.length}문제</span>
                     {locked && <Lock size={13} className="ml-auto text-muted" aria-label="잠김" />}
                   </div>
                   <h3 className="mt-3 text-lg font-semibold tracking-tight">{s.title}</h3>

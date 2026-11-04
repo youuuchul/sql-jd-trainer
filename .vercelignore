@@ -8,3 +8,11 @@ server/.env
 .env.*
 .npmrc
 *.tsbuildinfo
+# 콘텐츠는 운영 DB 에서 읽는다
+content/problems/
+content/sets/
+content/schemas/
+content/cards/
+content/generators/
+content/eval/wrong-queries.json
+docs/private/

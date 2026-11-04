@@ -25,7 +25,7 @@ export async function POST(request: Request) {
   const { schemaId, sql } = body;
   if (typeof schemaId !== "string" || typeof sql !== "string") return Response.json({ error: "schemaId와 sql이 필요합니다." }, { status: 400 });
   if (sql.length > MAX_SQL_LENGTH) return Response.json({ error: "쿼리가 너무 깁니다." }, { status: 413 });
-  const schema = getSchema(schemaId);
+  const schema = await getSchema(schemaId);
   if (!schema) return Response.json({ error: "알 수 없는 스키마입니다." }, { status: 404 });
   if (schema.locked && !(await isUnlocked())) return Response.json({ error: "잠긴 세트입니다." }, { status: 403 });
   try {

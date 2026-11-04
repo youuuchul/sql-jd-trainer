@@ -5,7 +5,7 @@ import { listSubscriptions, sendPush } from "@/lib/push/server";
 export async function GET(request: Request) {
   const secret = process.env.CRON_SECRET;
   if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) return new Response("Unauthorized", { status: 401 });
-  const cards = listDecks().flatMap((d) => d.cards);
+  const cards = (await listDecks()).flatMap((d) => d.cards);
   const subs = await listSubscriptions();
   let sent = 0;
   let removed = 0;
