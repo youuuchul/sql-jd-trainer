@@ -99,6 +99,7 @@ E2E는 `npx next dev -p 3100`이 떠 있어야 하며, MySQL 시나리오는 `MY
 ## 문서
 
 - `docs/research/03-engine-and-landscape.md`: 실행 엔진·유사 서비스 조사
+- `docs/portfolio.md`: 포트폴리오용 정리(핵심 장면, 사용자 흐름, 화면 목록, 구현)
 
 ## 라이선스
 
