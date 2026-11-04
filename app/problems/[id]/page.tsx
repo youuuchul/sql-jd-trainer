@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { LockGate } from "@/components/LockGate";
 import { Workspace } from "@/components/workspace/Workspace";
 import { getProblem, getSchema, listProblems } from "@/lib/content/loader";
 
@@ -10,5 +11,5 @@ export default async function ProblemPage({ params }: PageProps<"/problems/[id]"
   if (!problem) notFound();
   const schema = getSchema(problem.schema);
   if (!schema) notFound();
-  return <Workspace problem={problem} schema={schema} />;
+  return <LockGate locked={schema.locked} title={schema.domain} render={() => <Workspace problem={problem} schema={schema} />} />;
 }

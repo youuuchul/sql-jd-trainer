@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { LockGate } from "@/components/LockGate";
 import { MockExam } from "@/components/workspace/MockExam";
 import { getSchema, getSet, listSets, setProblems } from "@/lib/content/loader";
 
@@ -10,5 +11,5 @@ export default async function MockPage({ params }: PageProps<"/mock/[set]">) {
   if (!set) notFound();
   const schema = getSchema(set.schema);
   if (!schema) notFound();
-  return <MockExam set={set} problems={setProblems(set)} schema={schema} />;
+  return <LockGate locked={schema.locked} title={set.title} render={() => <MockExam set={set} problems={setProblems(set)} schema={schema} />} />;
 }

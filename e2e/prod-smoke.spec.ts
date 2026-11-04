@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { unlock } from "./helpers";
 import { expect, test, type Page } from "@playwright/test";
 
 /** 배포 URL 대상 스모크. MySQL은 서버 환경변수가 없으면 연결 실패 안내가 떠야 한다. E2E_BASE_URL 로 대상 지정. */
@@ -13,6 +14,7 @@ const setEditor = async (page: Page, sql: string) => {
 
 test("배포 스모크: PostgreSQL·BigQuery 실행, MySQL 미연결 안내", async ({ page }) => {
   test.skip(!process.env.E2E_BASE_URL, "E2E_BASE_URL 필요");
+  await unlock(page);
   await page.goto("/problems/e01-conversion-days");
   await expect(page.getByText("준비됨")).toBeVisible({ timeout: 90_000 });
   await setEditor(page, e01.solutions.postgres);

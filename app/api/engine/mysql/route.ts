@@ -1,5 +1,6 @@
 import { getSchema } from "@/lib/content/loader";
 import { healthCheck, mysqlConfigured, runReadOnly } from "@/lib/engine/mysql-server";
+import { isUnlocked } from "@/lib/unlock/server";
 
 const MAX_SQL_LENGTH = 20000;
 
@@ -26,6 +27,7 @@ export async function POST(request: Request) {
   if (sql.length > MAX_SQL_LENGTH) return Response.json({ error: "쿼리가 너무 깁니다." }, { status: 413 });
   const schema = getSchema(schemaId);
   if (!schema) return Response.json({ error: "알 수 없는 스키마입니다." }, { status: 404 });
+  if (schema.locked && !(await isUnlocked())) return Response.json({ error: "잠긴 세트입니다." }, { status: 403 });
   try {
     const result = await runReadOnly(schema, sql);
     return Response.json(result);

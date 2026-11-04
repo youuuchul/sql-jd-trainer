@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { unlock } from "./helpers";
 import { expect, test, type Page } from "@playwright/test";
 
 const problem = (id: string, dir: "expected" | "domain" | "formats") => JSON.parse(readFileSync(`content/problems/${dir}/${id}.json`, "utf-8"));
@@ -14,6 +15,10 @@ const setEditor = async (page: Page, sql: string) => {
 const waitReady = async (page: Page) => {
   await expect(page.getByText("준비됨")).toBeVisible({ timeout: 90_000 });
 };
+
+test.beforeEach(async ({ page }) => {
+  await unlock(page);
+});
 
 test("문제 풀이 흐름: PostgreSQL 정답·오답 진단·BigQuery·MySQL·진행 저장", async ({ page }) => {
   const e01 = problem("e01-conversion-days", "expected");

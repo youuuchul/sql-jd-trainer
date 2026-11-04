@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { LockGate } from "@/components/LockGate";
 import { ProblemList } from "@/components/ProblemList";
 import { Badge } from "@/components/ui-lab/components/badge/Badge";
 import { getSchema, getSet, listSets, setProblems } from "@/lib/content/loader";
+import type { ProblemSet, SchemaDef } from "@/lib/content/types";
 
 export const generateStaticParams = () => listSets().map((s) => ({ set: s.id }));
 
@@ -10,8 +12,12 @@ export default async function SetPage({ params }: PageProps<"/sets/[set]">) {
   const { set: setId } = await params;
   const set = getSet(setId);
   if (!set) notFound();
-  const problems = setProblems(set);
   const schema = getSchema(set.schema);
+  return <LockGate locked={schema?.locked ?? false} title={set.title} render={() => <SetView set={set} schema={schema} />} />;
+}
+
+function SetView({ set, schema }: { set: ProblemSet; schema: SchemaDef | undefined }) {
+  const problems = setProblems(set);
   return (
     <div className="mx-auto w-full max-w-3xl px-5 py-10">
       <Link href="/" className="text-xs text-muted hover:text-fg">

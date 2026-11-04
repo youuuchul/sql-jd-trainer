@@ -1,0 +1,10 @@
+# Vercel CLI 는 .gitignore 를 읽지 않는다. 비공개 자료와 로컬 비밀값은 업로드하지 않는다
+docs/research/test/
+ai_history/
+e2e/results/
+e2e/shots/
+server/.env
+.env
+.env.*
+.npmrc
+*.tsbuildinfo
