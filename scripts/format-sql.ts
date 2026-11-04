@@ -194,7 +194,9 @@ export const formatSql = (sql: string, dialect: Dialect, width: number): string 
     logicalOperatorNewline: "before",
     expressionWidth: width,
   });
-  const lines = toLines(raw);
+  // 포매터가 :: 뒤 자료형을 대문자로 바꾸지 않는다. 문자열 리터럴 밖만 고친다
+  const typed = raw.split(/('(?:[^']|'')*')/).map((part, i) => (i % 2 ? part : part.replace(/::\s*([a-z_][a-z0-9_]*)/g, (_, t: string) => `::${t.toUpperCase()}`))).join("");
+  const lines = toLines(typed);
   fixBetween(lines);
   for (let guard = 0; guard < 2000; guard++) {
     if (collapse(lines, width) || mergeRoot(lines, width) || mergeUnion(lines)) continue;
