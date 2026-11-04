@@ -132,7 +132,7 @@ export function Workspace({ problem, schema, mode = "practice", index, total, on
           </div>
         </div>
         <div className="min-h-[14rem] flex-1 overflow-hidden rounded-xl border border-line bg-bg">
-          <SqlEditor value={sql} onChange={setSql} dialect={dialect} onRun={onRun} />
+          <SqlEditor value={sql} onChange={setSql} dialect={dialect} onRun={onRun} schema={schema} />
         </div>
         {run.error && (
           <pre className="rounded-xl border border-fail/40 bg-fail/10 px-4 py-3 font-mono text-[12.5px] leading-relaxed whitespace-pre-wrap text-fail">

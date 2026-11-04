@@ -47,6 +47,15 @@ test.describe("하루 카드 (모바일)", () => {
     const first = await promptOf();
     expect(first, "화면의 카드가 덱에 있어야 한다").toBeTruthy();
 
+    // 빈칸 너비가 입력 길이에 맞춰 늘고 준다
+    const blank = page.getByLabel("빈칸");
+    const widthOf = async () => (await blank.boundingBox())!.width;
+    const empty = await widthOf();
+    await blank.fill("abcdefghijkl");
+    await expect.poll(widthOf).toBeGreaterThan(empty * 2);
+    await blank.fill("ab");
+    await expect.poll(widthOf).toBeCloseTo(empty, 0);
+
     // 1장: 오답
     await page.getByLabel("빈칸").fill("zzz_wrong");
     await page.getByRole("button", { name: "확인" }).click();

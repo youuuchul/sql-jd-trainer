@@ -38,3 +38,17 @@ for (const p of samples) {
     }
   });
 }
+
+test("자동완성: 문제 스키마의 테이블, 별칭 뒤 컬럼, 접두어 없는 컬럼", async ({ page }) => {
+  await page.goto("/problems/ba-01-where-in-compare");
+  await expect(page.getByText("준비됨")).toBeVisible({ timeout: 90_000 });
+  const list = page.locator(".cm-tooltip-autocomplete");
+  await setEditor(page, "SELECT * FROM ord");
+  await expect(list).toContainText("orders");
+  await page.keyboard.press("Escape");
+  await setEditor(page, "SELECT * FROM orders o WHERE o.sta");
+  await expect(list).toContainText("status");
+  await page.keyboard.press("Escape");
+  await setEditor(page, "SELECT customer_");
+  await expect(list).toContainText("customer_id");
+});

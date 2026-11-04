@@ -85,7 +85,8 @@ export function CardSession({ queue: initial, onAnswer, onExit }: Props) {
   };
 
   const done = pos + (outcome ? 1 : 0);
-  const width = Math.max(4, Math.min(answer.length + 2, 22));
+  // 입력 길이에 맞춰 늘고 준다. 커서 자리 1칸, 빈 상태 최소 4칸. 패딩(px-1.5)과 테두리(1px)를 더한다
+  const blankWidth = `calc(${Math.max(input.length + 1, 4)}ch + 0.75rem + 2px)`;
 
   return (
     <div className="mx-auto flex w-full max-w-lg flex-1 flex-col px-4 pt-4 pb-6">
@@ -143,8 +144,8 @@ export function CardSession({ queue: initial, onAnswer, onExit }: Props) {
                 autoComplete="off"
                 spellCheck={false}
                 enterKeyHint="done"
-                style={{ width: `${width}ch` }}
-                className="mx-0.5 rounded-md border border-accent/50 bg-accent/10 px-1.5 py-0.5 font-mono text-[16px] text-fg outline-none focus:border-accent sm:text-[14px]"
+                style={{ width: blankWidth }}
+                className="mx-0.5 max-w-full rounded-md border border-accent/50 bg-accent/10 px-1.5 py-0.5 font-mono text-[16px] text-fg outline-none transition-[width] duration-100 ease-out focus:border-accent motion-reduce:transition-none sm:text-[14px]"
               />
             )}
             {after}
