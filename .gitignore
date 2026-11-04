@@ -48,3 +48,14 @@ server/.env
 docs/research/test/
 e2e/results/
 e2e/shots/
+
+# 비공개 세트 원문(앱에서는 비밀번호로 잠금). 로컬과 Vercel CLI 배포에는 포함된다(.vercelignore 는 .gitignore 를 읽지 않는다)
+content/problems/expected/
+content/problems/domain/
+content/problems/formats/
+content/sets/archive-practice.json
+content/sets/archive-mock.json
+content/sets/archive-drills.json
+content/eval/wrong-queries.json
+content/schemas/archive.json
+scripts/gen-schema.ts
