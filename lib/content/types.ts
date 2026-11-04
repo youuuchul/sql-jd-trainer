@@ -174,6 +174,10 @@ export const CardSchema = z.object({
   caseSensitive: z.boolean().default(false),
   hint: z.string(),
   explanation: z.string(),
+  /** core: 실무에서 자주 쓰는 기본, applied: 응용. 새 카드는 core 위주로 나온다 */
+  level: z.enum(["core", "applied"]).default("core"),
+  /** 풀고 나서 함께 보여 줄 문법 항목(SyntaxRef.id) */
+  syntax: z.array(z.string()).default([]),
   /** 빌드가 answers[0] 을 넣어 실행한 결과로 채운다 */
   result: z.object({ columns: z.array(z.string()), rows: z.array(z.array(CellSchema)) }).optional(),
 });
@@ -186,3 +190,20 @@ export const CardDeckSchema = z.object({
   cards: z.array(CardSchema).min(1),
 });
 export type CardDeck = z.infer<typeof CardDeckSchema>;
+
+/** 카드에 붙는 함수·구문 문법. forms 는 방언별 형태(common 은 세 방언 공통) */
+export const SyntaxRefSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  summary: z.string(),
+  forms: z
+    .array(
+      z.object({
+        dialect: z.enum(["common", ...DIALECTS]),
+        code: z.string(),
+        note: z.string().optional(),
+      }),
+    )
+    .min(1),
+});
+export type SyntaxRef = z.infer<typeof SyntaxRefSchema>;

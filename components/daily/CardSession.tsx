@@ -1,8 +1,8 @@
 "use client";
 import { Check, Lightbulb, X } from "lucide-react";
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
-import { DIALECT_LABEL, type Card } from "@/lib/content/types";
-import { isCorrect, splitTemplate, type Outcome } from "@/lib/daily/srs";
+import { DIALECT_LABEL, type Card, type SyntaxRef } from "@/lib/content/types";
+import { isCorrect, splitTemplate, type DialectFilter, type Outcome } from "@/lib/daily/srs";
 
 export interface SessionCard extends Card {
   deckTitle: string;
@@ -17,6 +17,9 @@ export interface SessionResult {
 
 interface Props {
   queue: SessionCard[];
+  syntax: Record<string, SyntaxRef>;
+  /** 방언을 하나로 골랐으면 문법도 공통과 그 방언 형태만 보인다 */
+  dialectFilter: DialectFilter;
   onAnswer: (card: SessionCard, outcome: Outcome, firstTry: boolean) => void;
   onExit: (results: SessionResult[]) => void;
 }
@@ -28,7 +31,13 @@ const DIALECT_TONE: Record<string, string> = {
   common: "text-muted",
 };
 
-export function CardSession({ queue: initial, onAnswer, onExit }: Props) {
+/** 카드 방언 형태를 먼저, 다음 공통, 나머지 방언 순 */
+const formsFor = (ref: SyntaxRef, cardDialect: Card["dialect"], filter: DialectFilter) => {
+  const rank = (d: string) => (d === cardDialect ? 0 : d === "common" ? 1 : 2);
+  return ref.forms.filter((f) => filter === "all" || f.dialect === "common" || f.dialect === filter || f.dialect === cardDialect).sort((a, b) => rank(a.dialect) - rank(b.dialect));
+};
+
+export function CardSession({ queue: initial, syntax, dialectFilter, onAnswer, onExit }: Props) {
   const [queue, setQueue] = useState(initial);
   const [pos, setPos] = useState(0);
   const [input, setInput] = useState("");
@@ -43,13 +52,15 @@ export function CardSession({ queue: initial, onAnswer, onExit }: Props) {
   const isRetry = card ? queue.findIndex((c) => c.id === card.id) < pos : false;
 
   useEffect(() => {
-    if (outcome) nextRef.current?.focus();
+    // 결과 아래 해설·문법을 읽도록 다음 버튼으로 화면을 내리지 않는다
+    if (outcome) nextRef.current?.focus({ preventScroll: true });
     else inputRef.current?.focus();
   }, [outcome, pos]);
 
   if (!card) return null;
   const [before, after] = splitTemplate(card.template);
   const answer = card.answers[0];
+  const refs = card.syntax.map((id) => syntax[id]).filter((r): r is SyntaxRef => r !== undefined);
 
   const submit = (giveUp = false) => {
     if (outcome) return;
@@ -107,6 +118,7 @@ export function CardSession({ queue: initial, onAnswer, onExit }: Props) {
           <div className="flex items-center gap-2 text-xs">
             <span className="text-muted">{card.deckTitle}</span>
             <span className={`font-medium ${DIALECT_TONE[card.dialect]}`}>{card.dialect === "common" ? "공통" : DIALECT_LABEL[card.dialect]}</span>
+            {card.level === "applied" && <span className="text-muted">응용</span>}
             <span className="ml-auto">
               {outcome === "wrong" && !isRetry ? (
                 <span className="rounded-full bg-warn/15 px-2 py-0.5 font-medium text-warn">5분 뒤 복습</span>
@@ -188,6 +200,24 @@ export function CardSession({ queue: initial, onAnswer, onExit }: Props) {
               </div>
             )}
           </div>
+        )}
+        {outcome && refs.length > 0 && (
+          <section aria-label="문법" className="border-t border-line px-5 py-4">
+            <h3 className="text-xs font-semibold text-muted">문법</h3>
+            {refs.map((ref) => (
+              <div key={ref.id} className="mt-3">
+                <p className="font-mono text-[13.5px] font-semibold">{ref.title}</p>
+                <p className="mt-1 text-[13px] leading-relaxed text-fg/80">{ref.summary}</p>
+                {formsFor(ref, card.dialect, dialectFilter).map((f, i) => (
+                  <div key={i} className="mt-2.5">
+                    <p className={`text-[11px] font-medium ${DIALECT_TONE[f.dialect]}`}>{f.dialect === "common" ? "공통" : DIALECT_LABEL[f.dialect]}</p>
+                    <pre className="mt-1 rounded-lg bg-fg/[0.05] px-3 py-2 font-mono text-[12.5px] leading-relaxed whitespace-pre-wrap break-words">{f.code}</pre>
+                    {f.note && <p className="mt-1 text-[12.5px] leading-relaxed text-fg/70">{f.note}</p>}
+                  </div>
+                ))}
+              </div>
+            ))}
+          </section>
         )}
       </article>
 

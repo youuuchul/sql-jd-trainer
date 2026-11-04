@@ -1,5 +1,5 @@
 /**
- * 로컬 content/(문제·세트·스키마·카드)를 검증해 운영 DB(content_item)에 그대로 맞춘다. 로컬에 없는 행은 지운다.
+ * 로컬 content/(문제·세트·스키마·카드·카드 문법)를 검증해 운영 DB(content_item)에 그대로 맞춘다. 로컬에 없는 행은 지운다.
  * 콘텐츠는 저장소에 두지 않는다. 작성·검증은 로컬 파일로 하고 이 스크립트로 게시한다.
  * 실행: npx tsx scripts/publish-content.ts                  # DB 반영
  *       npx tsx scripts/publish-content.ts --dry-run        # 검증만
@@ -10,7 +10,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { loadEnvConfig } from "@next/env";
 import { neon } from "@neondatabase/serverless";
-import { CardDeckSchema, ProblemSchema, ProblemSetSchema, SchemaDefSchema } from "../lib/content/types";
+import { CardDeckSchema, ProblemSchema, ProblemSetSchema, SchemaDefSchema, SyntaxRefSchema } from "../lib/content/types";
 
 loadEnvConfig(process.cwd(), true);
 
@@ -19,7 +19,7 @@ const listJson = (dir: string): string[] =>
   readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? listJson(path.join(dir, e.name)) : e.name.endsWith(".json") ? [path.join(dir, e.name)] : [])).sort();
 const readJson = (file: string): unknown => JSON.parse(readFileSync(file, "utf-8"));
 
-type Row = { kind: "schema" | "problem" | "set" | "deck"; id: string; body: unknown };
+type Row = { kind: "schema" | "problem" | "set" | "deck" | "syntax"; id: string; body: unknown };
 
 const collect = (): Row[] => {
   const rows: Row[] = [];
@@ -45,9 +45,21 @@ const collect = (): Row[] => {
     for (const id of s.problems) if (!problemIds.has(id)) throw new Error(`${file}: unknown problem ${id}`);
     rows.push({ kind: "set", id: s.id, body: s });
   }
+  const syntaxIds = new Set<string>();
+  for (const file of listJson(path.join(ROOT, "syntax"))) {
+    for (const s of SyntaxRefSchema.array().parse(readJson(file))) {
+      if (syntaxIds.has(s.id)) throw new Error(`${file}: 문법 id 중복 ${s.id}`);
+      syntaxIds.add(s.id);
+      rows.push({ kind: "syntax", id: s.id, body: s });
+    }
+  }
   for (const file of listJson(path.join(ROOT, "cards"))) {
     const d = CardDeckSchema.parse(readJson(file));
-    for (const c of d.cards) if (!c.result) throw new Error(`${file}: 카드 ${c.id} 의 result 가 없습니다. build-cards 를 먼저 실행하세요.`);
+    for (const c of d.cards) {
+      if (!c.result) throw new Error(`${file}: 카드 ${c.id} 의 result 가 없습니다. build-cards 를 먼저 실행하세요.`);
+      if (!c.syntax.length) throw new Error(`${file}: 카드 ${c.id} 에 문법(syntax)이 없습니다.`);
+      for (const id of c.syntax) if (!syntaxIds.has(id)) throw new Error(`${file}: 카드 ${c.id} 의 문법 ${id} 가 content/syntax 에 없습니다.`);
+    }
     rows.push({ kind: "deck", id: d.id, body: d });
   }
   return rows;
@@ -57,7 +69,7 @@ const main = async () => {
   const args = process.argv.slice(2);
   const rows = collect();
   const count = (k: Row["kind"]) => rows.filter((r) => r.kind === k).length;
-  console.log(`검증 통과: 스키마 ${count("schema")}, 문제 ${count("problem")}, 세트 ${count("set")}, 덱 ${count("deck")}`);
+  console.log(`검증 통과: 스키마 ${count("schema")}, 문제 ${count("problem")}, 세트 ${count("set")}, 덱 ${count("deck")}, 문법 ${count("syntax")}`);
   if (args.includes("--dry-run")) return;
 
   const url = process.env.DATABASE_URL;

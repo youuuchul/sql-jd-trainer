@@ -2,7 +2,7 @@
 import { Flame } from "lucide-react";
 import { useMemo, useState } from "react";
 import { SegmentedControl } from "@/components/ui-lab/components/segmented-control/SegmentedControl";
-import { DIALECT_LABEL, DIALECTS, type CardDeck } from "@/lib/content/types";
+import { DIALECT_LABEL, DIALECTS, type CardDeck, type SyntaxRef } from "@/lib/content/types";
 import { buildQueue, dayKey, MASTERED_BOX, matchesDialect, streak, type DialectFilter } from "@/lib/daily/srs";
 import { useDailyStore, useNow } from "@/lib/daily/store";
 import { CardSession, type SessionCard, type SessionResult } from "./CardSession";
@@ -13,13 +13,14 @@ const DIALECT_OPTIONS: { value: DialectFilter; label: string }[] = [{ value: "al
 
 type View = { kind: "home" } | { kind: "session"; queue: SessionCard[] } | { kind: "summary"; results: SessionResult[] };
 
-export function DailyApp({ decks }: { decks: CardDeck[] }) {
+export function DailyApp({ decks, syntax }: { decks: CardDeck[]; syntax: SyntaxRef[] }) {
   const { store, record, updateSettings } = useDailyStore();
   const [view, setView] = useState<View>({ kind: "home" });
   const [now, refreshNow] = useNow();
   const { goal, dialect } = store.settings;
 
   const cards = useMemo(() => decks.flatMap((d) => d.cards.map((c) => ({ ...c, deckTitle: d.title }))), [decks]);
+  const syntaxById = useMemo(() => Object.fromEntries(syntax.map((s) => [s.id, s])), [syntax]);
   const today = store.days[dayKey(now)] ?? { answered: 0, correct: 0 };
   const completed = useMemo(() => new Set(Object.entries(store.days).filter(([, d]) => d.answered >= goal).map(([k]) => k)), [store.days, goal]);
   const pool = cards.filter((c) => matchesDialect(c, dialect));
@@ -38,6 +39,8 @@ export function DailyApp({ decks }: { decks: CardDeck[] }) {
     return (
       <CardSession
         queue={view.queue}
+        syntax={syntaxById}
+        dialectFilter={dialect}
         onAnswer={(card, outcome, firstTry) => record(card.id, outcome, Date.now(), firstTry)}
         onExit={(results) => {
           refreshNow();

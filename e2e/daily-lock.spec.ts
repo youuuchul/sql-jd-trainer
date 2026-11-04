@@ -1,12 +1,13 @@
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { devices, expect, test } from "@playwright/test";
-import type { Card } from "../lib/content/types";
+import type { Card, SyntaxRef } from "../lib/content/types";
 import { problem, set } from "./content";
 
 const DIR = "content/cards";
 const cards: Card[] = readdirSync(DIR).flatMap((f) => (JSON.parse(readFileSync(path.join(DIR, f), "utf-8")) as { cards: Card[] }).cards);
 const byPrompt = new Map(cards.map((c) => [c.prompt, c]));
+const syntaxTitle = new Map((JSON.parse(readFileSync("content/syntax/functions.json", "utf-8")) as SyntaxRef[]).map((s) => [s.id, s.title]));
 
 test("홈: 분류 순서와 잠긴 세트 표시", async ({ page }) => {
   await page.goto("/");
@@ -65,13 +66,19 @@ test.describe("하루 카드 (모바일)", () => {
     await page.getByRole("button", { name: "확인" }).click();
     await expect(page.getByText("오답", { exact: true })).toBeVisible();
     await expect(page.getByText("5분 뒤 복습")).toBeVisible();
-    await expect(page.locator("article pre")).toContainText(first!.answers[0]);
+    await expect(page.locator("article pre").first()).toContainText(first!.answers[0]);
+    // 풀고 나면 이 카드의 함수 문법이 함께 보인다
+    const grammar = page.getByRole("region", { name: "문법" });
+    for (const id of first!.syntax) await expect(grammar).toContainText(syntaxTitle.get(id)!);
     await page.getByRole("button", { name: "다음 문제" }).click();
+    const shown = [first!];
 
     // 2장: 힌트 후 정답, 3~5장: 정답 (Enter 제출)
     for (let i = 0; i < 4; i++) {
       const card = await promptOf();
       expect(card).toBeTruthy();
+      shown.push(card!);
+      await expect(page.locator("article").getByText("응용", { exact: true })).toHaveCount(card!.level === "applied" ? 1 : 0);
       if (i === 0) {
         await page.getByRole("button", { name: "힌트" }).click();
         await expect(page.getByText(card!.hint)).toBeVisible();
@@ -81,6 +88,9 @@ test.describe("하루 카드 (모바일)", () => {
       await expect(page.getByText(i === 0 ? "정답 (힌트 사용)" : "정답", { exact: true })).toBeVisible();
       await page.getByRole("button", { name: "다음 문제" }).click();
     }
+
+    // 새 카드는 자주 쓰는 카드 위주: 5장 중 응용은 1장 이하
+    expect(shown.filter((c) => c.level === "applied").length).toBeLessThanOrEqual(1);
 
     // 6번째: 틀렸던 카드가 다시 나온다
     expect((await promptOf())?.id).toBe(first!.id);

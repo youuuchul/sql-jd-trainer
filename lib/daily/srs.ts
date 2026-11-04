@@ -51,8 +51,24 @@ const seededShuffle = <T,>(items: T[], seedText: string): T[] => {
   return out;
 };
 
+/** 새 카드는 이 장수마다 응용 카드 한 장이 들어간다(4장 중 1장). 나머지는 자주 쓰는 카드이고, 한쪽이 떨어지면 남은 쪽으로 채운다 */
+export const APPLIED_EVERY = 4;
+
+const mixByLevel = <T extends Card>(cards: T[]): T[] => {
+  const core = cards.filter((c) => c.level !== "applied");
+  const applied = cards.filter((c) => c.level === "applied");
+  const out: T[] = [];
+  while (core.length || applied.length) {
+    const appliedSlot = (out.length + 1) % APPLIED_EVERY === 0;
+    const takeApplied = applied.length > 0 && (appliedSlot || core.length === 0);
+    out.push((takeApplied ? applied : core).shift()!);
+  }
+  return out;
+};
+
 /**
  * 오늘 풀 카드. 복습 시각이 지난 카드를 먼저(오래된 순), 남는 자리는 처음 보는 카드를 날짜 시드로 섞어 채운다.
+ * 처음 보는 카드는 자주 쓰는 카드 위주로, 응용 카드는 APPLIED_EVERY 장마다 한 장씩 섞는다.
  * 같은 날에는 같은 순서가 나오도록 seedText 에 날짜를 넣는다.
  */
 export const buildQueue = <T extends Card>(
@@ -62,9 +78,11 @@ export const buildQueue = <T extends Card>(
 ): T[] => {
   const pool = cards.filter((c) => matchesDialect(c, opts.filter) && !opts.exclude?.has(c.id));
   const due = pool.filter((c) => states[c.id] && states[c.id].due <= opts.now).sort((a, b) => states[a.id].due - states[b.id].due);
-  const fresh = seededShuffle(
-    pool.filter((c) => !states[c.id]),
-    opts.seedText,
+  const fresh = mixByLevel(
+    seededShuffle(
+      pool.filter((c) => !states[c.id]),
+      opts.seedText,
+    ),
   );
   return [...due, ...fresh].slice(0, Math.max(opts.size, 0));
 };

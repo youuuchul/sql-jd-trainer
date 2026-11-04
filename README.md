@@ -11,7 +11,7 @@
   - 직무별 실무 7개: 마케팅, 그로스/PM, 영업, 인사, CS/운영, 물류/SCM, 재무
   - KPI 대시보드 2개: Placewave 마트에서 개요 스코어보드, 퍼널·리텐션·마케팅 효율 카드 재현
   - 비공개 복습 아카이브 3개: 개인 복습용. 비밀번호(`UNLOCK_PASSWORD`)로 잠겨 있다
-- 오늘의 카드(`/daily`): 함수 이름·함수 인자 빈칸을 채우는 카드 119장(10개 덱, 방언별 카드 포함). 하루 목표 n장, 틀린 카드는 5분 뒤 다시, 맞힌 카드는 1·3·7·14·30일 간격으로 복습. 기록은 localStorage
+- 오늘의 카드(`/daily`): 함수 이름·함수 인자 빈칸을 채우는 카드 119장(10개 덱, 방언별 카드 포함). 하루 목표 n장, 틀린 카드는 5분 뒤 다시, 맞힌 카드는 1·3·7·14·30일 간격으로 복습. 새 카드는 자주 쓰는 카드 위주이고 응용 카드는 4장에 1장꼴로 섞인다. 풀고 나면 그 카드의 함수 문법(방언별 형태와 차이)이 함께 보인다. 기록은 localStorage
 - PWA와 알림: 홈 화면에 설치할 수 있고, 알림을 켜면 매일 오전 9시 무렵(Vercel Cron, 00:00 UTC) Web Push 로 오늘의 카드를 알린다. iOS 는 홈 화면에 추가한 앱에서만 알림을 받는다
 - 문제 형식: 쿼리 작성, 깨진 쿼리 고치기(시작 쿼리 제공), 객관식, 출력 예측(입력 표와 쿼리를 보고 결과 입력), 결과 이상 찾기(잘못된 쿼리 결과에서 틀린 행 선택)
 - 오답 진단: 문제별 오답 패턴 해시(문제당 2~3개)를 먼저 대조하고, 없으면 NULL·정수 나눗셈·정렬·행 수 규칙으로 라벨을 낸다
@@ -23,7 +23,7 @@
 - 해설: 결과 · 조회 기준 · 인사이트 구조, 방언별 정답 쿼리와 메모, 자주 나오는 오답
 - 진행 상태: 방언별 마지막 쿼리와 통과 여부를 localStorage에 저장
 - 공고 분석(`/jd`): 채용 공고 본문을 붙여넣으면 역량 키워드 사전(`content/jd/competencies.json`)으로 요구 역량을 찾고, 문제 태그와 겹치는 문제를 추천한다. 잠긴 세트 문제는 추천하지 않는다. AI 호출 없음
-- 콘텐츠 저장: 문제·세트·시드·카드는 운영 DB(Neon Postgres, `content_item`)에 있고 저장소에는 없다. 앱은 `use cache`(태그 `content`)로 읽는다
+- 콘텐츠 저장: 문제·세트·시드·카드·카드 문법은 운영 DB(Neon Postgres, `content_item`)에 있고 저장소에는 없다. 앱은 `use cache`(태그 `content`)로 읽는다
 
 ## 개발
 
@@ -61,7 +61,8 @@ MYSQL_URL='mysql://root:sjt@127.0.0.1:3307/' npm run dev
 content/schemas/<id>.json      방언 중립 시드 (content/generators/gen-schema-<id>.ts 가 생성)
 content/problems/<group>/*.json 문제 본문, 방언별 정답, 기대 결과, 오답 패턴, 해설
 content/sets/*.json             세트 구성 (practice | mock, category basics | job | kpi | archive)
-content/cards/*.json            오늘의 카드 덱 (빈칸 ___ 하나, 테이블 없이 실행되는 SQL)
+content/cards/*.json            오늘의 카드 덱 (빈칸 ___ 하나, 테이블 없이 실행되는 SQL, level core | applied, syntax 문법 id)
+content/syntax/*.json           카드 풀이 뒤에 보여 주는 함수·구문 문법 (방언별 형태)
 content/jd/competencies.json    공고 분석용 역량 사전 (keywords -> problemTags)
 ```
 
@@ -93,7 +94,7 @@ node e2e/screenshots.mjs                  # 화면 캡처 -> e2e/shots/
 E2E는 `npx next dev -p 3100`이 떠 있어야 하며, MySQL 시나리오는 `MYSQL_URL`을 준 dev 서버가 필요하다. 잠긴 세트는 `.env.local` 의 `UNLOCK_PASSWORD` 로 화면에서 연다(playwright.config 가 읽는다).
 
 - `e2e/flow.spec.ts`: 문제 풀이·포맷·모의 시험·공고 분석
-- `e2e/daily-lock.spec.ts`: 홈 분류, 잠금 해제, 오늘의 카드(모바일 폭) 오답 재출제와 기록 유지
+- `e2e/daily-lock.spec.ts`: 홈 분류, 잠금 해제, 오늘의 카드(모바일 폭) 오답 재출제, 풀이 뒤 문법 표시, 응용 카드 비중, 기록 유지
 - `e2e/schemas.spec.ts`: 잠기지 않은 스키마마다 한 문제를 브라우저 엔진 세 방언으로 채점
 
 ## 문서

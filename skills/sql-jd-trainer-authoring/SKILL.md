@@ -19,7 +19,8 @@ description: SQL JD Trainer 문제·시드 작성과 검증 절차 (content JSON
   - explanation: "결과 / 조회 기준 / 인사이트" 세 줄로 시작하고 풀이 핵심을 덧붙인다
   - dialectNotes{postgres, bigquery, mysql}
 - `content/sets/<id>.json`: problems 배열에 id를 넣는다. category(basics|job|kpi|archive)와 order 를 둔다. mock 세트는 timeLimitMin을 둔다.
-- `content/cards/<번호>-<주제>.json`: 오늘의 카드 덱. 카드마다 dialect(common|postgres|bigquery|mysql), prompt, template(빈칸 `___` 정확히 1개, 테이블 없이 리터럴·CTE로 실행, 6줄·48자 이하), answers(첫 번째가 대표 답), caseSensitive, hint, explanation. result 는 `scripts/build-cards.ts` 가 채운다. common 은 세 방언 결과가 같아야 한다.
+- `content/cards/<번호>-<주제>.json`: 오늘의 카드 덱. 카드마다 dialect(common|postgres|bigquery|mysql), prompt, template(빈칸 `___` 정확히 1개, 테이블 없이 리터럴·CTE로 실행, 6줄·48자 이하), answers(첫 번째가 대표 답), caseSensitive, hint, explanation, level(core: 실무에서 자주 쓰는 기본, applied: 응용·방언 특수 문법. 새 카드는 core 위주로 나오고 applied 는 4장에 1장꼴), syntax(풀이 뒤 보여 줄 `content/syntax` 항목 id, 1개 이상). result 는 `scripts/build-cards.ts` 가 채운다. common 은 세 방언 결과가 같아야 한다.
+- `content/syntax/<이름>.json`: 카드 문법 항목 배열. id, title, summary(한두 문장), forms(dialect 별 code, 선택 note). code 는 모바일 폭(약 38자)에 맞춰 줄을 나누고 주석은 줄 위에 둔다. 게시 스크립트가 카드의 syntax id 가 모두 있는지 검사한다.
 - 결과 해시는 행을 정렬해 만든다. 정렬 순서만 틀리는 실수는 오답 패턴으로 구분되지 않으니 패턴 대신 해설의 "자주 하는 실수"에 적는다(채점 시 "정렬 조건" 규칙이 잡는다).
 
 ## 방언 규칙
