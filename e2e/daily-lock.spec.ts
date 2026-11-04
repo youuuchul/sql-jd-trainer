@@ -52,13 +52,26 @@ test.describe("하루 카드 (모바일)", () => {
     const first = await promptOf();
     expect(first, "화면의 카드가 덱에 있어야 한다").toBeTruthy();
 
-    // 빈칸 너비가 입력 길이에 맞춰 늘고 준다
+    // 빈칸은 처음부터 정답 글자 수만큼 보이고, 정답보다 길게 쓰면 늘었다가 지우면 그 너비로 돌아온다
     const blank = page.getByLabel("빈칸");
     const widthOf = async () => (await blank.boundingBox())!.width;
+    const { ch, pad } = await blank.evaluate((el) => {
+      // 빈칸 옆(같은 코드 블록)에서 잰다. body 에 붙이면 모바일 글자 자동 확대로 폭이 달라진다
+      const s = document.createElement("span");
+      s.style.cssText = `position:absolute;visibility:hidden;font:${getComputedStyle(el).font}`;
+      s.textContent = "0".repeat(20);
+      el.parentElement!.append(s);
+      const w = s.getBoundingClientRect().width / 20;
+      s.remove();
+      const cs = getComputedStyle(el);
+      return { ch: w, pad: parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight) + parseFloat(cs.borderLeftWidth) + parseFloat(cs.borderRightWidth) };
+    });
+    const answerLen = first!.answers[0].length;
     const empty = await widthOf();
-    await blank.fill("abcdefghijkl");
-    await expect.poll(widthOf).toBeGreaterThan(empty * 2);
-    await blank.fill("ab");
+    expect(Math.abs(empty - (answerLen * ch + pad)), "빈 상태 너비 = 정답 글자 수").toBeLessThan(1.5);
+    await blank.fill("x".repeat(answerLen + 8));
+    await expect.poll(widthOf).toBeGreaterThan(empty + 7 * ch);
+    await blank.fill("x".repeat(Math.max(answerLen - 1, 0)));
     await expect.poll(widthOf).toBeCloseTo(empty, 0);
 
     // 1장: 오답

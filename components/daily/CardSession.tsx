@@ -96,8 +96,8 @@ export function CardSession({ queue: initial, syntax, dialectFilter, onAnswer, o
   };
 
   const done = pos + (outcome ? 1 : 0);
-  // 입력 길이에 맞춰 늘고 준다. 커서 자리 1칸, 빈 상태 최소 4칸. 패딩(px-1.5)과 테두리(1px)를 더한다
-  const blankWidth = `calc(${Math.max(input.length + 1, 4)}ch + 0.75rem + 2px)`;
+  // 빈 상태는 정답 글자 수만큼(길이 힌트), 그보다 길게 쓰면 커서 자리 1칸을 더해 늘어난다. 패딩(px-1.5)과 테두리(1px)를 더한다
+  const blankWidth = `calc(${Math.max(answer.length, input.length + 1)}ch + 0.75rem + 2px)`;
 
   return (
     <div className="mx-auto flex w-full max-w-lg flex-1 flex-col px-4 pt-4 pb-6">
