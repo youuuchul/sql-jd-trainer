@@ -44,6 +44,8 @@ export const ensureSchema = (schema: SchemaDef): Promise<void> => {
     const version = schemaVersion(schema);
     const conn = await getPool().getConnection();
     try {
+      // 풀 연결은 이전 runReadOnly 의 READ ONLY 세션을 그대로 갖고 온다
+      await conn.query("SET SESSION TRANSACTION READ WRITE");
       await conn.query(`CREATE DATABASE IF NOT EXISTS \`${db}\``);
       await conn.changeUser({ database: db });
       await conn.query(`CREATE TABLE IF NOT EXISTS \`${META_TABLE}\` (schema_id VARCHAR(64) PRIMARY KEY, version VARCHAR(32) NOT NULL)`);

@@ -58,7 +58,7 @@ const stripStrings = (sql: string): string => sql.replace(/'(?:[^'\\]|\\.|'')*'|
 export const isReadOnly = (sql: string): boolean => {
   const body = stripStrings(stripComments(sql)).trim().toLowerCase();
   if (!/^(select|with)\b/.test(body)) return false;
-  return !/\b(insert|update|delete|drop|alter|create|truncate|grant|revoke|replace|merge|call|load|into\s+(outfile|dumpfile)|copy|attach|install|pragma|set\s+)\b/.test(body);
+  return !/\b(insert|update|delete|drop|alter|create|truncate(?!\s*\()|grant|revoke|replace\s+into|merge|call|load|into\s+(outfile|dumpfile)|copy|attach|install|pragma|set\s+)\b/.test(body);
 };
 
 /**
