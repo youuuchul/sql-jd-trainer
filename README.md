@@ -70,6 +70,7 @@ content/jd/competencies.json    공고 분석용 역량 사전 (keywords -> prob
 ```bash
 npx tsx scripts/gen-schema.ts                    # 시드 재생성 (다른 스키마는 scripts/gen-schema-<id>.ts)
 MYSQL_URL=... npx tsx scripts/build-cards.ts     # 카드 빈칸에 정답을 넣어 실행하고 result 를 채운다
+npx tsx scripts/format-sql.ts                    # 화면에 보이는 예시 SQL 양식 통일 (--check 로 검사만)
 MYSQL_URL=... npx tsx scripts/build-expected.ts  # 전체. 뒤에 문제 ID 접두사를 주면 일부만
 npx tsx scripts/eval-diagnose.ts                 # 오답 진단 적중률(content/eval/wrong-queries.json, 목표 80%)
 npx tsx scripts/eval-jd.ts                       # 공고 역량 매핑 평가(content/eval/jd-samples.json, 전부 통과해야 함)

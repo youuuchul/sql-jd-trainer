@@ -26,6 +26,9 @@ description: SQL JD Trainer 문제·시드 작성과 검증 절차 (content JSON
 - BigQuery에서 TIMESTAMP와 DATE를 바로 비교하지 않는다. `DATE(paid_at)`으로 맞춘다.
 - PostgreSQL 정수 나눗셈은 `::numeric` 캐스팅으로 피한다.
 
+## SQL 양식
+화면에 보이는 SQL(카드 template, 문제 solutions·starterSql·spot.sql)은 `npx tsx scripts/format-sql.ts` 로 맞춘다. 키워드·함수 대문자, 2칸 들여쓰기, 절마다 새 줄, SELECT 항목이 둘 이상이면 한 줄에 하나, JOIN·AND/OR 는 들여쓴 새 줄, CTE 본문 들여쓰기, 리터럴 데이터 행은 `UNION ALL SELECT ...` 한 줄. 문제·카드를 추가하거나 고친 뒤 실행하고 `--check` 가 "바뀔 파일 없음"이어야 한다. 포맷은 공백·대소문자만 바꾸므로 build-expected·build-cards 결과가 그대로여야 한다.
+
 ## 검증
 ```bash
 MYSQL_URL='mysql://root:sjt@127.0.0.1:3307/' npx tsx scripts/build-expected.ts <id 접두사...>
