@@ -41,7 +41,21 @@
       "note": "SQL과 무관한 문장. 아무 역량도 잡히지 않아야 함",
       "text": "안녕하세요. 회의는 오후 세 시에 시작합니다. 점심 메뉴를 알려주세요.",
       "expected": [],
-      "unexpected": ["metric-design", "data-quality", "complex-logic", "data-mart", "ab-test", "funnel", "cohort-retention", "event-log", "payment-domain", "window-functions", "segment-ltv", "active-users", "query-quality"]
+      "unexpected": ["metric-design", "data-quality", "complex-logic", "data-mart", "ab-test", "funnel", "cohort-retention", "event-log", "payment-domain", "window-functions", "segment-ltv", "active-users", "query-quality", "marketing-performance", "sales-pipeline", "hr-analytics", "cs-operations", "scm-logistics", "finance-pnl", "dashboard-kpi"]
+    },
+    {
+      "id": "marketing-analyst",
+      "note": "마케팅 분석. 채널 성과와 대시보드. 데이터 파이프라인 언급이 영업으로 잡히면 안 됨",
+      "text": "주요 업무\n- 퍼포먼스 마케팅 채널별 ROAS, CAC를 분석하고 예산 배분을 제안합니다.\n- UTM 기반 유입 데이터를 정리하고 Tableau 대시보드를 운영합니다.\n자격 요건\n- SQL로 데이터 파이프라인 산출물을 검토할 수 있는 분",
+      "expected": ["marketing-performance", "dashboard-kpi"],
+      "unexpected": ["sales-pipeline", "hr-analytics", "cs-operations", "scm-logistics", "finance-pnl"]
+    },
+    {
+      "id": "people-analytics",
+      "note": "인사 데이터 분석. '인사이트'가 인사로 잡히지 않는지와 analytics 안의 cs 오검출 확인",
+      "text": "People Analytics 팀에서 이직률, 근속 기간 같은 인사 지표를 정의하고 경영진에게 인사이트를 전달합니다. 채용 데이터 품질을 관리합니다.",
+      "expected": ["hr-analytics"],
+      "unexpected": ["cs-operations", "marketing-performance", "sales-pipeline", "scm-logistics", "finance-pnl"]
     }
   ]
 }

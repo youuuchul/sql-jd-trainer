@@ -9,6 +9,7 @@ const schema: SchemaDef = {
   timezone: "Asia/Seoul",
   notes: [],
   metrics: [],
+  locked: false,
   tables: [
     {
       name: "t",

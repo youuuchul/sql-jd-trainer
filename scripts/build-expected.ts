@@ -31,9 +31,9 @@ const main = async () => {
   let failures = 0;
 
   for (const file of listJson(path.join(ROOT, "problems"))) {
+    if (filters.length && !filters.some((f) => path.basename(file).startsWith(f))) continue;
     const raw = JSON.parse(readFileSync(file, "utf-8"));
     const problem: Problem = ProblemSchema.parse(raw);
-    if (filters.length && !filters.some((f) => problem.id.startsWith(f))) continue;
     const schema = schemas.get(problem.schema);
     if (!schema) throw new Error(`${problem.id}: unknown schema`);
     const line: string[] = [problem.id.padEnd(34)];

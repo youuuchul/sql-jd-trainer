@@ -1,7 +1,7 @@
 import "server-only";
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
-import { ProblemSchema, ProblemSetSchema, SchemaDefSchema, type Problem, type ProblemSet, type SchemaDef } from "./types";
+import { CardDeckSchema, ProblemSchema, ProblemSetSchema, SchemaDefSchema, type CardDeck, type Problem, type ProblemSet, type SchemaDef } from "./types";
 
 const ROOT = path.join(process.cwd(), "content");
 
@@ -17,7 +17,7 @@ const listJson = (dir: string): string[] => {
   return out.sort();
 };
 
-let cache: { schemas: Map<string, SchemaDef>; problems: Map<string, Problem>; sets: Map<string, ProblemSet> } | null = null;
+let cache: { schemas: Map<string, SchemaDef>; problems: Map<string, Problem>; sets: Map<string, ProblemSet>; decks: CardDeck[] } | null = null;
 
 const load = () => {
   if (cache) return cache;
@@ -43,7 +43,14 @@ const load = () => {
     }
     sets.set(s.id, s);
   }
-  cache = { schemas, problems, sets };
+  const decks = listJson(path.join(ROOT, "cards"))
+    .map((file) => {
+      const deck = CardDeckSchema.parse(readJson(file));
+      for (const c of deck.cards) if (!c.result) throw new Error(`${file}: 카드 ${c.id} 의 result 가 없습니다. scripts/build-cards.ts 를 먼저 실행하세요.`);
+      return deck;
+    })
+    .sort((a, b) => a.order - b.order);
+  cache = { schemas, problems, sets, decks };
   return cache;
 };
 
@@ -58,3 +65,4 @@ export const setProblems = (set: ProblemSet): Problem[] =>
     if (!p) throw new Error(`unknown problem ${id}`);
     return p;
   });
+export const listDecks = (): CardDeck[] => load().decks;

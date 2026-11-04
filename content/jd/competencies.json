@@ -6,14 +6,14 @@
       "label": "지표 정의와 설계",
       "frequency": "57%",
       "keywords": ["지표", "KPI", "메트릭", "metric", "북극성", "OKR"],
-      "problemTags": ["지표 정의", "분모 정의", "비율 계산", "집계"]
+      "problemTags": ["지표 정의", "분모 정의", "비율 계산", "집계", "전환율", "비율 지표", "사람·일", "집계 단위 분리", "전월 대비", "증감률"]
     },
     {
       "id": "data-quality",
       "label": "정합성과 데이터 품질 검증",
       "frequency": "30%",
       "keywords": ["정합성", "데이터 품질", "자기검증", "자기 검증", "검증", "data quality", "신뢰할 수 있는"],
-      "problemTags": ["정합성 검증", "결과 이상 찾기", "NULL 처리", "NULL", "조인 팬아웃", "조인 다중성", "날짜 경계"]
+      "problemTags": ["정합성 검증", "결과 이상 찾기", "NULL 처리", "NULL", "조인 팬아웃", "조인 다중성", "날짜 경계", "삼값 논리", "정수 나눗셈", "문자열 정제", "경계 시각", "자정 경계", "중복 제거", "기준 시점"]
     },
     {
       "id": "complex-logic",
@@ -41,14 +41,14 @@
       "label": "퍼널 분석",
       "frequency": "17%",
       "keywords": ["퍼널", "funnel", "전환율", "전환 분석", "전환 단계", "conversion"],
-      "problemTags": ["퍼널", "순차 조건", "조건부 집계", "날짜 차이"]
+      "problemTags": ["퍼널", "순차 조건", "조건부 집계", "날짜 차이", "전환율", "단계 전환율", "순서 있는 단계", "온보딩"]
     },
     {
       "id": "cohort-retention",
       "label": "코호트와 리텐션",
       "frequency": "17%",
       "keywords": ["코호트", "cohort", "리텐션", "retention", "잔존", "재방문", "재구매", "이탈"],
-      "problemTags": ["코호트", "리텐션", "anti-join", "NOT EXISTS", "누적 집계"]
+      "problemTags": ["코호트", "리텐션", "anti-join", "NOT EXISTS", "누적 집계", "안티 조인", "재방문", "W1"]
     },
     {
       "id": "event-log",
@@ -69,7 +69,7 @@
       "label": "윈도우 함수와 고급 집계",
       "frequency": "복잡 로직의 전제 수단",
       "keywords": ["윈도우", "window", "랭킹", "ranking", "순위", "누적", "이동평균", "이동 평균", "최근 N", "세션"],
-      "problemTags": ["윈도우 함수", "ROW_NUMBER", "RANK", "윈도우 프레임", "이동평균", "누적합", "LAG", "COUNT OVER", "동점 처리"]
+      "problemTags": ["윈도우 함수", "ROW_NUMBER", "RANK", "윈도우 프레임", "이동평균", "누적합", "LAG", "COUNT OVER", "동점 처리", "SUM OVER", "AVG OVER", "DENSE_RANK", "FIRST_VALUE", "LEAD", "ROWS BETWEEN", "PARTITION BY"]
     },
     {
       "id": "segment-ltv",
@@ -83,7 +83,7 @@
       "label": "활성 사용자와 이탈 지표",
       "frequency": "지표 설계 공고 공통",
       "keywords": ["MAU", "DAU", "WAU", "활성 사용자", "활성 유저", "액티브", "active user", "이탈", "churn"],
-      "problemTags": ["지표 정의", "COUNT DISTINCT", "누적 집계", "anti-join", "날짜 경계"]
+      "problemTags": ["지표 정의", "COUNT DISTINCT", "누적 집계", "anti-join", "날짜 경계", "DAU", "WAU", "MAU", "stickiness", "활성 사용자", "COUNT(DISTINCT)", "안티 조인"]
     },
     {
       "id": "query-quality",
@@ -91,6 +91,55 @@
       "frequency": "9%",
       "keywords": ["가독성", "표준화", "쿼리 리뷰", "코드 리뷰", "재사용", "유지보수", "readable"],
       "problemTags": ["깨진 쿼리 고치기", "CTE", "출력 예측", "WHERE vs ON", "NOT IN"]
+    },
+    {
+      "id": "marketing-performance",
+      "label": "마케팅 성과 분석",
+      "frequency": "직무 세트",
+      "keywords": ["마케팅", "퍼포먼스", "광고", "ROAS", "CAC", "CTR", "CPC", "UTM", "어트리뷰션", "attribution", "캠페인"],
+      "problemTags": ["ROAS", "CAC", "CTR", "CPC", "광고 성과", "UTM 정규화", "캠페인 귀속", "마케팅 지표", "첫 구매"]
+    },
+    {
+      "id": "sales-pipeline",
+      "label": "영업 파이프라인",
+      "frequency": "직무 세트",
+      "keywords": ["영업", "세일즈", "Sales", "CRM", "Salesforce", "수주", "영업 기회"],
+      "problemTags": ["단계 전환율", "승률", "영업 사이클", "단계 정체", "목표 달성률", "영업 지표", "파이프라인 관리"]
+    },
+    {
+      "id": "hr-analytics",
+      "label": "인사 데이터 분석",
+      "frequency": "직무 세트",
+      "keywords": ["인사 데이터", "인사 지표", "HR 데이터", "HR 분석", "피플 애널리틱스", "People Analytics", "이직률", "근속", "채용 데이터"],
+      "problemTags": ["월말 재직자", "이직률", "연봉 밴드", "채용 퍼널", "이력 테이블", "기준 시점"]
+    },
+    {
+      "id": "cs-operations",
+      "label": "고객 지원·운영 지표",
+      "frequency": "직무 세트",
+      "keywords": ["고객 문의", "고객센터", "VOC", "상담", "CSAT", "고객 만족도", "응답 시간", "처리 시간", "운영 지표"],
+      "problemTags": ["첫 응답 시간", "SLA 준수율", "재문의율", "CSAT", "응답률", "업무 시간"]
+    },
+    {
+      "id": "scm-logistics",
+      "label": "물류·재고 지표",
+      "frequency": "직무 세트",
+      "keywords": ["SCM", "물류", "재고", "배송", "공급망", "풀필먼트", "리드타임"],
+      "problemTags": ["정시 배송률", "결품 일수", "재고 회전율", "리드타임", "음수 재고"]
+    },
+    {
+      "id": "finance-pnl",
+      "label": "재무·손익 분석",
+      "frequency": "직무 세트",
+      "keywords": ["재무", "회계", "손익", "P&L", "FP&A", "예산 대비", "예실", "원가", "경영 분석", "경영기획"],
+      "problemTags": ["월 손익", "마진율", "예산 대비 실적", "집행률", "YoY", "전년 동월 대비", "미수금 연령", "수정 전표"]
+    },
+    {
+      "id": "dashboard-kpi",
+      "label": "KPI 대시보드 구축",
+      "frequency": "직무 세트",
+      "keywords": ["대시보드", "dashboard", "Tableau", "Looker", "Redash", "Superset", "Power BI", "BI 툴", "BI 도구", "시각화", "리포팅"],
+      "problemTags": ["북극성 지표", "GMV", "거래액", "객단가", "플랫폼 매출", "실효 수수료율", "환불률", "구독 해지율", "WAU", "전월 대비"]
     }
   ]
 }

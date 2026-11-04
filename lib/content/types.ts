@@ -39,6 +39,8 @@ export const SchemaDefSchema = z.object({
   timezone: z.string().default("Asia/Seoul"),
   notes: z.array(z.string()).default([]),
   metrics: z.array(z.object({ name: z.string(), definition: z.string() })).default([]),
+  /** 비밀번호로 잠근 스키마. 이 스키마의 세트·문제는 잠금 해제 후에만 열린다. */
+  locked: z.boolean().default(false),
   tables: z.array(SeedTableSchema).min(1),
 });
 export type SchemaDef = z.infer<typeof SchemaDefSchema>;
@@ -97,9 +99,10 @@ export const DIFFICULTY_LABEL: Record<Difficulty, string> = {
   advanced: "상급",
 };
 
-export const SourceTypeSchema = z.enum(["expected", "domain", "jd"]);
+export const SourceTypeSchema = z.enum(["basic", "expected", "domain", "jd"]);
 export type SourceType = z.infer<typeof SourceTypeSchema>;
 export const SOURCE_LABEL: Record<SourceType, string> = {
+  basic: "기초 문법",
   expected: "개인 복습",
   domain: "도메인 문제",
   jd: "JD 기반",
@@ -135,13 +138,51 @@ export const ProblemSchema = z.object({
 });
 export type Problem = z.infer<typeof ProblemSchema>;
 
+export const SetCategorySchema = z.enum(["basics", "job", "kpi", "archive"]);
+export type SetCategory = z.infer<typeof SetCategorySchema>;
+export const SET_CATEGORY_LABEL: Record<SetCategory, string> = {
+  basics: "기초 문법",
+  job: "직무별 실무",
+  kpi: "KPI 대시보드",
+  archive: "비공개 복습 아카이브",
+};
+
 export const ProblemSetSchema = z.object({
   id: z.string(),
   title: z.string(),
   description: z.string(),
+  category: SetCategorySchema,
+  /** 같은 분류 안에서 정렬 순서(작을수록 앞) */
+  order: z.number().default(100),
   schema: z.string(),
   mode: z.enum(["practice", "mock"]),
   problems: z.array(z.string()).min(1),
   timeLimitMin: z.number().optional(),
 });
 export type ProblemSet = z.infer<typeof ProblemSetSchema>;
+
+/** 하루 카드: 빈칸 하나를 채우는 함수·인자 암기 카드. template 의 ___ 자리에 answers 중 하나가 들어가면 실행 가능한 SQL이 된다. */
+export const CardSchema = z.object({
+  id: z.string(),
+  /** common: 세 방언 모두 같은 답 */
+  dialect: z.enum(["common", ...DIALECTS]),
+  /** 무엇을 하려는지 한국어 한 문장 */
+  prompt: z.string(),
+  /** 빈칸 ___ 이 정확히 1개. 테이블 없이 리터럴·CTE만으로 실행된다 */
+  template: z.string(),
+  answers: z.array(z.string()).min(1),
+  caseSensitive: z.boolean().default(false),
+  hint: z.string(),
+  explanation: z.string(),
+  /** 빌드가 answers[0] 을 넣어 실행한 결과로 채운다 */
+  result: z.object({ columns: z.array(z.string()), rows: z.array(z.array(CellSchema)) }).optional(),
+});
+export type Card = z.infer<typeof CardSchema>;
+
+export const CardDeckSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  order: z.number().default(100),
+  cards: z.array(CardSchema).min(1),
+});
+export type CardDeck = z.infer<typeof CardDeckSchema>;
