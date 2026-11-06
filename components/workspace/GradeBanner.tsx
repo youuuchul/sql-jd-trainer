@@ -14,7 +14,7 @@ export function GradeBanner({ cmp, diagnoses, ms }: { cmp: CompareResult; diagno
         <div className="flex items-center gap-2 text-sm text-fg-2">
           <Icon name="ccircle" size={20} className="text-pass" />
           <b className="text-[15px] font-extrabold text-pass-ink">정답</b>
-          <span className="font-mono text-[12.5px]">{ms}ms</span>
+          {ms > 0 && <span className="font-mono text-[12.5px]">{ms}ms</span>}
         </div>
         <p className="mt-1.5 text-[13.5px] font-medium text-fg-2">기대 결과와 일치합니다.</p>
       </div>
@@ -26,7 +26,7 @@ export function GradeBanner({ cmp, diagnoses, ms }: { cmp: CompareResult; diagno
         <Icon name="xcircle" size={20} className="text-fail" />
         <b className="text-[15px] font-extrabold text-fail-ink">오답</b>
         <span className="font-mono text-[12.5px]">
-          기대 {cmp.expectedRows}행 · 결과 {cmp.actualRows}행 · {ms}ms
+          기대 {cmp.expectedRows}행 · 결과 {cmp.actualRows}행{ms > 0 && ` · ${ms}ms`}
         </span>
       </div>
       {cmp.mismatches.map((m, i) => (

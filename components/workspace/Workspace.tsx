@@ -337,8 +337,7 @@ export function Workspace({ problem, schema, mode = "practice", nav, onGraded, f
         header={top}
         headerClassName={mode === "practice" ? "sticky top-[env(safe-area-inset-top)] z-20 bg-bg" : ""}
         listClassName={`px-5 !gap-[26px] ${showTabs ? "" : "hidden"}`}
-        className="flex-1"
-        panelClassName="px-4 pt-3.5 pb-28"
+        panelClassName={`px-4 pt-3.5 ${footer ? "pb-4" : "pb-28"}`}
       />
       {footer && <div className="px-4 pb-28">{footer}</div>}
       {isQuery && (
