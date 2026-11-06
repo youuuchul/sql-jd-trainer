@@ -1,7 +1,8 @@
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
-import type { Problem } from "../lib/content/types";
+import { ExpectedSchema, type Problem } from "../lib/content/types";
+import { compareResult } from "../lib/grading/compare";
 
 /** 잠기지 않은 스키마마다 첫 쿼리 작성 문제를 골라 브라우저 엔진 세 방언에서 정답 처리되는지 본다 */
 const ROOT = "content/problems";
@@ -27,15 +28,19 @@ const setEditor = async (page: Page, sql: string) => {
 };
 
 for (const p of samples) {
-  test(`${p.schema}: ${p.id} 세 방언 정답`, async ({ page }) => {
+  test(`${p.schema}: ${p.id} 세 방언 정답(MySQL 은 서버 경로)`, async ({ page }) => {
     await page.goto(`/problems/${p.id}`);
-    for (const [label, dialect] of [["PostgreSQL", "postgres"], ["BigQuery", "bigquery"], ["MySQL", "mysql"]] as const) {
+    for (const [label, dialect] of [["PostgreSQL", "postgres"], ["BigQuery", "bigquery"]] as const) {
       await page.getByRole("radio", { name: label }).click();
       await expect(page.getByText("준비됨")).toBeVisible({ timeout: 90_000 });
       await setEditor(page, p.solutions![dialect]!);
       await page.getByRole("button", { name: /실행/ }).click();
       await expect(page.getByText("정답", { exact: true }), `${dialect}`).toBeVisible();
     }
+    // MySQL 은 화면에서 숨겨 서버 Route Handler 를 직접 부른다
+    const res = await page.request.post("/api/engine/mysql", { data: { schemaId: p.schema, sql: p.solutions!.mysql! } });
+    expect(res.ok(), await res.text()).toBeTruthy();
+    expect(compareResult(ExpectedSchema.parse(p.expected), await res.json()).pass, "mysql").toBe(true);
   });
 }
 

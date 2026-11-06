@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
-import { REVIEW_CATEGORY, type Problem, type ReviewCategory } from "../lib/content/types";
+import { ExpectedSchema, REVIEW_CATEGORY, type Problem, type ReviewCategory } from "../lib/content/types";
+import { compareResult } from "../lib/grading/compare";
 import { JD_MOCK_SET_KEY } from "../lib/jd/mock-set";
 import { lockedSchemaIds, problem, problems, set } from "./content";
 import { unlock } from "./helpers";
@@ -18,7 +19,7 @@ const waitReady = async (page: Page) => {
 
 test("문제 풀이 흐름: PostgreSQL 정답·오답 진단·BigQuery·MySQL·진행 저장", async ({ page }) => {
   const p = problem("ba-01-where-in-compare");
-  await page.goto("/");
+  await page.goto("/practice");
   await expect(page.getByRole("heading", { level: 1 })).toContainText("라이브 쿼리");
   await page.goto("/sets/basics-01-select-filter");
   await page.getByRole("link", { name: new RegExp(p.title) }).click();
@@ -51,20 +52,23 @@ test("문제 풀이 흐름: PostgreSQL 정답·오답 진단·BigQuery·MySQL·�
   await page.getByRole("button", { name: /실행/ }).click();
   await expect(page.getByText("정답", { exact: true })).toBeVisible();
 
-  // MySQL (원격 Route Handler)
-  await page.getByRole("radio", { name: "MySQL" }).click();
-  await waitReady(page);
-  await setEditor(page, p.solutions!.mysql!);
-  await page.getByRole("button", { name: /실행/ }).click();
-  await expect(page.getByText("정답", { exact: true })).toBeVisible();
-  await setEditor(page, "DROP TABLE orders");
-  await page.getByRole("button", { name: /실행/ }).click();
-  await expect(page.locator("pre", { hasText: /조회 쿼리만/ })).toBeVisible();
+  // MySQL (원격 Route Handler). 화면에서는 고를 수 없어 브라우저 엔진이 부르는 경로를 직접 부른다
+  await expect(page.getByRole("radio", { name: "MySQL" })).toHaveCount(0);
+  const mysql = (sql: string) => page.request.post("/api/engine/mysql", { data: { schemaId: p.schema, sql } });
+  const solved = await mysql(p.solutions!.mysql!);
+  expect(solved.ok(), await solved.text()).toBeTruthy();
+  expect(compareResult(ExpectedSchema.parse(p.expected), await solved.json()).pass).toBe(true);
+  const dropped = await mysql("DROP TABLE orders");
+  expect(dropped.status()).toBe(400);
+  expect((await dropped.json()).error).toMatch(/조회 쿼리만/);
 
   // 새로고침 후 방언·쿼리·통과 상태 유지
+  await setEditor(page, "SELECT 1 AS keep_after_reload");
+  await page.getByRole("button", { name: /실행/ }).click();
+  await expect(page.getByText("오답", { exact: true })).toBeVisible();
   await page.reload();
-  await expect(page.getByRole("radio", { name: "MySQL" })).toBeChecked();
-  await expect(page.locator(".cm-content")).toContainText("DROP TABLE");
+  await expect(page.getByRole("radio", { name: "BigQuery" })).toBeChecked();
+  await expect(page.locator(".cm-content")).toContainText("keep_after_reload");
   await page.goto("/sets/basics-01-select-filter");
   const row = page.getByRole("link", { name: new RegExp(p.title) });
   await expect(row.getByText("통과")).toBeVisible();
@@ -160,7 +164,7 @@ test("쿼리 리뷰: 유형 다름·오탐 채점, 정답 공개, 새로고침 �
   const decoy = review.decoys[0];
   const other: ReviewCategory = d0.category === "duplicate" ? "fanout" : "duplicate";
 
-  await page.goto("/");
+  await page.goto("/practice");
   await expect(page.getByRole("heading", { name: "쿼리 리뷰", exact: true })).toBeVisible();
   await page.goto(`/sets/${reviewSet.id}`);
   await page.getByRole("link", { name: new RegExp(p.title) }).click();

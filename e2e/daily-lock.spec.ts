@@ -9,8 +9,8 @@ const cards: Card[] = readdirSync(DIR).flatMap((f) => (JSON.parse(readFileSync(p
 const byPrompt = new Map(cards.map((c) => [c.prompt, c]));
 const syntaxTitle = new Map((JSON.parse(readFileSync("content/syntax/functions.json", "utf-8")) as SyntaxRef[]).map((s) => [s.id, s.title]));
 
-test("홈: 분류 순서와 잠긴 세트 표시", async ({ page }) => {
-  await page.goto("/");
+test("연습: 분류 순서와 잠긴 세트 표시", async ({ page }) => {
+  await page.goto("/practice");
   await expect(page.locator("section > h2")).toHaveText(["기초 문법", "직무별 실무", "KPI 대시보드", "쿼리 리뷰", "비공개 복습 아카이브"]);
   await expect(page.getByLabel("잠김")).toHaveCount(3);
 });
