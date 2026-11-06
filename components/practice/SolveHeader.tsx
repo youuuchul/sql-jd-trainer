@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/icons";
 import type { SetCategory } from "@/lib/content/types";
 import { useProgressStore } from "@/lib/progress";
+import { splitSetTitle } from "./setTitle";
 
 /** 문제 풀이 화면이 속한 세트 정보. 풀이 헤더의 위치·이전·다음에 쓴다 */
 export interface SetNav {
@@ -65,7 +66,7 @@ export function SolveTopDesktop({ nav }: { nav?: SetNav }) {
       {nav && (
         <>
           <span className="hq-catink text-sm font-bold">
-            {nav.setTitle.startsWith(CAT_SHORT[nav.category]) ? nav.setTitle : `${CAT_SHORT[nav.category]} · ${nav.setTitle}`}
+            {CAT_SHORT[nav.category]} · {splitSetTitle(nav.setTitle, nav.category).name}
           </span>
           <span className="ml-1.5 flex gap-1.5" aria-hidden="true">
             {nav.items.map((it, i) => {

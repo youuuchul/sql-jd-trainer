@@ -2,8 +2,9 @@ import { notFound } from "next/navigation";
 import { LockGate } from "@/components/LockGate";
 import { ProblemList } from "@/components/ProblemList";
 import { BackButton } from "@/components/practice/SolveHeader";
+import { splitSetTitle } from "@/components/practice/setTitle";
 import { Button } from "@/components/ui/Button";
-import { CAT_CLASS, CAT_SHORT } from "@/components/ui/category";
+import { CAT_CLASS } from "@/components/ui/category";
 import { Icon } from "@/components/ui/icons";
 import { getSchema, getSet, listSets, setProblems } from "@/lib/content/loader";
 import type { Problem, ProblemSet, SchemaDef } from "@/lib/content/types";
@@ -20,12 +21,13 @@ export default async function SetPage({ params }: PageProps<"/sets/[set]">) {
 }
 
 function SetView({ set, schema, problems }: { set: ProblemSet; schema: SchemaDef | undefined; problems: Problem[] }) {
+  const { kicker, name } = splitSetTitle(set.title, set.category);
   const minutes = problems.reduce((a, p) => a + (p.timeLimitMin ?? 0), 0);
   return (
     <div className="mx-auto w-full max-w-3xl px-5 pt-3 pb-8 lg:px-10 lg:py-8">
       <div className="flex items-center gap-3">
         <BackButton href="/practice" />
-        <span className={`${CAT_CLASS[set.category]} hq-catink text-sm font-bold`}>{CAT_SHORT[set.category]}</span>
+        <span className={`${CAT_CLASS[set.category]} hq-catink text-sm font-bold`}>{kicker}</span>
       </div>
       <div className={`${CAT_CLASS[set.category]} hq-catfill mt-4 rounded-[20px] px-[18px] pt-4 pb-[18px]`}>
         <div className="flex flex-wrap items-center gap-1.5">
@@ -34,7 +36,7 @@ function SetView({ set, schema, problems }: { set: ProblemSet; schema: SchemaDef
             {problems.length}문제{minutes > 0 ? ` · 권장 ${minutes}분` : ""}
           </span>
         </div>
-        <h1 className="mt-2 text-2xl leading-tight font-extrabold tracking-[-0.03em]">{set.title}</h1>
+        <h1 className="mt-2 text-2xl leading-tight font-extrabold tracking-[-0.03em]">{name}</h1>
         <p className="mt-1.5 text-[14px] leading-[1.55] font-medium opacity-85">{set.description}</p>
         {set.mode === "mock" && (
           <Button href={`/mock/${set.id}`} tone="inverse" size="sm" className="mt-4">
