@@ -1,11 +1,12 @@
 import { listDecks } from "@/lib/content/loader";
+import { isShown } from "@/lib/daily/srs";
 import { listSubscriptions, sendPush } from "@/lib/push/server";
 
 /** Vercel Cron 이 하루 한 번 호출한다. CRON_SECRET 이 Authorization 헤더로 온다. */
 export async function GET(request: Request) {
   const secret = process.env.CRON_SECRET;
   if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) return new Response("Unauthorized", { status: 401 });
-  const cards = (await listDecks()).flatMap((d) => d.cards);
+  const cards = (await listDecks()).flatMap((d) => d.cards.filter(isShown));
   const subs = await listSubscriptions();
   let sent = 0;
   let removed = 0;

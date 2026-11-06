@@ -104,10 +104,15 @@ export const isCorrect = (card: Pick<Card, "template" | "answers" | "caseSensiti
   return card.answers.some((a) => candidates.some((c) => norm(c, card.caseSensitive) === norm(a, card.caseSensitive)));
 };
 
-export const splitTemplate = (template: string): [string, string] => {
-  const i = template.indexOf(BLANK);
-  return [template.slice(0, i), template.slice(i + BLANK.length)];
-};
+/** 정답 후보가 이 글자 수 이하면 앞글자 힌트가 곧 정답이라 건너뛴다 */
+export const FIRST_LETTER_MIN_LEN = 3;
+
+/** 힌트 글에 정답 후보가 그대로 들어 있으면 ___ 로 가린다(대소문자 무시, 영숫자 경계) */
+export const maskAnswers = (text: string, answers: string[]): string =>
+  [...answers]
+    .filter((a) => a.trim())
+    .sort((a, b) => b.length - a.length)
+    .reduce((acc, a) => acc.replace(new RegExp(`(?<![A-Za-z0-9_])${a.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![A-Za-z0-9_])`, "gi"), BLANK), text);
 
 /** 로컬 날짜 키 YYYY-MM-DD */
 export const dayKey = (t: number): string => {

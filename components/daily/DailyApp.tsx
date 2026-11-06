@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Home } from "@/components/home/Home";
 import { SettingsSheet } from "@/components/home/SettingsSheet";
 import type { PathSet } from "@/lib/path";
@@ -17,6 +17,7 @@ export function DailyApp({ decks, syntax, pathSets }: { decks: CardDeck[]; synta
   const { store, record, updateSettings } = useDailyStore();
   const [view, setView] = useState<View>({ kind: "home" });
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const gearRef = useRef<HTMLButtonElement>(null);
   const [now, refreshNow] = useNow();
   const { goal } = store.settings;
   const dialect: DialectFilter = store.settings.dialect === "mysql" ? "all" : store.settings.dialect;
@@ -88,8 +89,13 @@ export function DailyApp({ decks, syntax, pathSets }: { decks: CardDeck[]; synta
         pathSets={pathSets}
         onStart={start}
         onOpenSettings={() => setSettingsOpen(true)}
+        gearRef={gearRef}
       />
-      {settingsOpen && <SettingsSheet goal={goal} dialect={dialect} onChange={updateSettings} onClose={() => setSettingsOpen(false)} />}
+      {settingsOpen && <SettingsSheet goal={goal} dialect={dialect} onChange={updateSettings} onClose={() => {
+            setSettingsOpen(false);
+            gearRef.current?.focus();
+          }}
+        />}
     </>
   );
 }

@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { SegmentedControl } from "@/components/ui-lab/components/segmented-control/SegmentedControl";
 import { Button } from "@/components/ui/Button";
 import { DIALECT_LABEL, UI_DIALECTS } from "@/lib/content/types";
@@ -19,6 +19,23 @@ export function SettingsSheet({ goal, dialect, onChange, onClose }: { goal: numb
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
+
+  /** 열려 있는 동안 Tab 이 시트 밖으로 나가지 않는다 */
+  const trapTab = (e: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== "Tab" || !panel.current) return;
+    const items = [...panel.current.querySelectorAll<HTMLElement>('button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])')];
+    if (!items.length) return;
+    const first = items[0];
+    const last = items[items.length - 1];
+    const active = document.activeElement;
+    if (e.shiftKey && (active === first || active === panel.current)) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && active === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  };
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center lg:items-center">
       <button type="button" aria-label="닫기" tabIndex={-1} onClick={onClose} className="absolute inset-0 bg-bg/60 backdrop-blur-[2px]" />
@@ -28,6 +45,7 @@ export function SettingsSheet({ goal, dialect, onChange, onClose }: { goal: numb
         aria-modal="true"
         aria-label="설정"
         tabIndex={-1}
+        onKeyDown={trapTab}
         className="relative w-full max-w-lg rounded-t-[28px] bg-surface p-5 pb-[calc(20px+env(safe-area-inset-bottom))] shadow-[inset_0_1px_0_var(--color-line)] outline-none lg:max-w-md lg:rounded-[28px] lg:pb-5 lg:shadow-[inset_0_0_0_1px_var(--color-line)]"
       >
         <h2 className="mb-4 text-xl font-extrabold tracking-[-0.03em]">설정</h2>
