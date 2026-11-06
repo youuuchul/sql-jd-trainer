@@ -17,11 +17,14 @@ export interface SetNav {
   index: number;
 }
 
+/** 뒤로 버튼의 접근성 이름은 실제 목적지를 따른다 */
+const backLabel = (href: string) => (href.startsWith("/sets/") ? "세트로 돌아가기" : href.startsWith("/practice") ? "연습으로 돌아가기" : href.startsWith("/jd") ? "공고로 돌아가기" : "돌아가기");
+
 export function BackButton({ href }: { href: string }) {
   return (
     <Link
       href={href}
-      aria-label="세트로 돌아가기"
+      aria-label={backLabel(href)}
       className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-surface text-fg-2 shadow-[inset_0_0_0_1.5px_var(--color-line-2),0_2px_0_var(--color-line-2)] focus-visible:outline-2 focus-visible:outline-accent dark:shadow-[inset_0_0_0_1px_var(--color-line-2)]"
     >
       <Icon name="back" size={21} />

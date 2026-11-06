@@ -11,8 +11,12 @@ const syntaxTitle = new Map((JSON.parse(readFileSync("content/syntax/functions.j
 
 test("연습: 분류 순서와 잠긴 세트 표시", async ({ page }) => {
   await page.goto("/practice");
-  await expect(page.locator("section > h2")).toHaveText(["기초 문법", "직무별 실무", "KPI 대시보드", "쿼리 리뷰", "비공개 복습 아카이브"]);
+  const cards = page.locator("button[aria-pressed] > b");
+  await expect(cards).toHaveText(["기초 문법", "직무별 실무", "KPI 대시보드", "쿼리 리뷰", "복습 아카이브"]);
+  await expect(page.getByLabel("잠김")).toHaveCount(0);
+  await cards.last().click();
   await expect(page.getByLabel("잠김")).toHaveCount(3);
+  await expect(page.locator('a[href^="/sets/archive-"]')).toHaveCount(3);
 });
 
 test("잠금: 비밀번호 전에는 문제가 보이지 않고, 틀린 비밀번호는 거절, 맞으면 세트와 문제가 열린다", async ({ page }) => {
