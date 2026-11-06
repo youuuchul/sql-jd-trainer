@@ -22,7 +22,7 @@
 - 채점: 정답 결과 집합과 비교(순서·허용 오차·NULL 정규화). 미리 계산한 오답 패턴 해시와 행 수 규칙으로 원인을 진단
 - 해설: 결과 · 조회 기준 · 인사이트 구조, 방언별 정답 쿼리와 메모, 자주 나오는 오답
 - 진행 상태: 방언별 마지막 쿼리와 통과 여부를 localStorage에 저장
-- 공고 분석(`/jd`): 채용 공고 본문을 붙여넣으면 역량 키워드 사전(`content/jd/competencies.json`)으로 요구 역량을 찾고, 문제 태그와 겹치는 문제를 추천한다. 잠긴 세트 문제는 추천하지 않는다. AI 호출 없음
+- 공고 분석(`/jd`): 채용 공고 본문을 붙여넣으면 역량 키워드 사전(`content/jd/competencies.json`)으로 요구 역량을 찾고, 문제 태그와 겹치는 문제를 추천한다. 잠긴 세트 문제는 추천하지 않는다. 추천 문제는 버튼 하나로 모의 시험(`/mock/jd`)으로 바로 풀 수 있다(추천 목록은 localStorage에 저장). AI 호출 없음
 - 콘텐츠 저장: 문제·세트·시드·카드·카드 문법은 운영 DB(Neon Postgres, `content_item`)에 있고 저장소에는 없다. 앱은 `use cache`(태그 `content`)로 읽는다
 
 ## 개발
@@ -93,7 +93,7 @@ node e2e/screenshots.mjs                  # 화면 캡처 -> e2e/shots/
 
 E2E는 `npx next dev -p 3100`이 떠 있어야 하며, MySQL 시나리오는 `MYSQL_URL`을 준 dev 서버가 필요하다. 잠긴 세트는 `.env.local` 의 `UNLOCK_PASSWORD` 로 화면에서 연다(playwright.config 가 읽는다).
 
-- `e2e/flow.spec.ts`: 문제 풀이·포맷·모의 시험·공고 분석
+- `e2e/flow.spec.ts`: 문제 풀이·포맷·모의 시험·공고 분석·공고 추천 모의 시험
 - `e2e/daily-lock.spec.ts`: 홈 분류, 잠금 해제, 오늘의 카드(모바일 폭) 오답 재출제, 풀이 뒤 문법 표시, 응용 카드 비중, 기록 유지
 - `e2e/schemas.spec.ts`: 잠기지 않은 스키마마다 한 문제를 브라우저 엔진 세 방언으로 채점
 
