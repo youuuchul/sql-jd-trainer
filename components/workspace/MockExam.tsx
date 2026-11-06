@@ -14,7 +14,18 @@ interface Attempt {
 
 const fmtClock = (sec: number) => `${String(Math.floor(sec / 60)).padStart(2, "0")}:${String(sec % 60).padStart(2, "0")}`;
 
-export function MockExam({ set, problems, schema }: { set: ProblemSet; problems: Problem[]; schema: SchemaDef }) {
+/** schemas: 문제들이 쓰는 스키마. 문제마다 problem.schema 로 고른다. backHref: 결과 화면의 "문제 목록으로" 링크 */
+export function MockExam({
+  set,
+  problems,
+  schemas,
+  backHref = `/sets/${set.id}`,
+}: {
+  set: Pick<ProblemSet, "id" | "title" | "description" | "timeLimitMin">;
+  problems: Problem[];
+  schemas: SchemaDef[];
+  backHref?: string;
+}) {
   const totalSec = (set.timeLimitMin ?? problems.reduce((a, p) => a + (p.timeLimitMin ?? 10), 0)) * 60;
   const [phase, setPhase] = useState<"intro" | "running" | "done">("intro");
   const [idx, setIdx] = useState(0);
@@ -123,7 +134,7 @@ export function MockExam({ set, problems, schema }: { set: ProblemSet; problems:
           >
             다시 보기
           </Button>
-          <Link href={`/sets/${set.id}`} className="inline-flex h-10 items-center rounded-xl px-4 text-sm font-semibold text-fg/80 hover:bg-fg/10">
+          <Link href={backHref} className="inline-flex h-10 items-center rounded-xl px-4 text-sm font-semibold text-fg/80 hover:bg-fg/10">
             문제 목록으로
           </Link>
         </div>
@@ -164,7 +175,7 @@ export function MockExam({ set, problems, schema }: { set: ProblemSet; problems:
       <Workspace
         key={problem.id}
         problem={problem}
-        schema={schema}
+        schema={schemas.find((s) => s.id === problem.schema)!}
         mode="mock"
         index={idx}
         total={problems.length}

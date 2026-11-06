@@ -12,5 +12,5 @@ export default async function MockPage({ params }: PageProps<"/mock/[set]">) {
   const schema = await getSchema(set.schema);
   if (!schema) notFound();
   const problems = await setProblems(set);
-  return <LockGate locked={schema.locked} title={set.title} render={() => <MockExam set={set} problems={problems} schema={schema} />} />;
+  return <LockGate locked={schema.locked} title={set.title} render={() => <MockExam set={set} problems={problems} schemas={[schema]} />} />;
 }
