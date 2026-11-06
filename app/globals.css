@@ -310,18 +310,6 @@ samp,
     outline: 2px solid var(--color-accent);
     outline-offset: 12px;
   }
-  /* 노드 사이 선. done 은 분류 색, 나머지는 선 색 */
-  .hq-link {
-    height: 6px;
-    flex: 1;
-    min-width: 8px;
-    border-radius: 3px;
-    background: var(--color-line-2);
-  }
-  .hq-link.done {
-    background: var(--cat);
-  }
-
   /* 진행 링 */
   .hq-ring {
     position: relative;

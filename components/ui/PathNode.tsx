@@ -36,8 +36,3 @@ export function PathNode({ state, category, icon = "write", size = 64, href, lab
     </span>
   );
 }
-
-/** 노드 사이 선. done 이면 분류 색. 가로 flex 안에서 남은 폭을 채운다 */
-export function PathLink({ done, category, className = "" }: { done: boolean; category: SetCategory; className?: string }) {
-  return <span aria-hidden="true" className={`hq-link ${done ? "done" : ""} ${CAT_CLASS[category]} ${className}`} />;
-}

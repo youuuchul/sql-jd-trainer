@@ -1,6 +1,6 @@
 import type { SetCategory } from "@/lib/content/types";
 
-/** 분류 색 범위 클래스. hq-catfill·hq-catink·hq-cattint·hq-node·hq-link 와 같이 쓴다 */
+/** 분류 색 범위 클래스. hq-catfill·hq-catink·hq-cattint·hq-node 와 같이 쓴다 */
 export const CAT_CLASS: Record<SetCategory, string> = {
   basics: "cat-basics",
   job: "cat-job",
