@@ -1,9 +1,11 @@
 "use client";
 import { useState } from "react";
-import { Button } from "@/components/ui-lab/components/button/Button";
+import { Button } from "@/components/ui/Button";
+import { Explanation } from "@/components/practice/Explanation";
+import { Icon } from "@/components/ui/icons";
 import type { Problem } from "@/lib/content/types";
 import { useProblemProgress } from "@/lib/progress";
-import { renderText } from "@/lib/text";
+import { Verdict } from "./GradeBanner";
 
 export function McqProblem({ problem, onGraded }: { problem: Problem; onGraded?: (passed: boolean) => void }) {
   const choices = problem.choices;
@@ -29,29 +31,32 @@ export function McqProblem({ problem, onGraded }: { problem: Problem; onGraded?:
         {choices.options.map((o) => {
           const on = selected.includes(o.key);
           const isAnswer = graded !== null && choices.answer.includes(o.key);
+          const wrong = graded === false && on && !isAnswer;
           return (
             <li key={o.key}>
               <button
                 type="button"
                 onClick={() => toggle(o.key)}
                 aria-pressed={on}
-                className={`flex w-full items-start gap-3 rounded-xl border px-4 py-3 text-left text-[13.5px] leading-relaxed transition-colors ${on ? "border-accent bg-accent/10" : "border-line bg-surface hover:bg-fg/5"} ${graded !== null && isAnswer ? "ring-1 ring-pass/60" : ""}`}
+                className={`flex w-full items-start gap-3 rounded-2xl px-4 py-3.5 text-left text-[14px] leading-[1.55] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-accent ${
+                  wrong ? "bg-fail-soft ring-2 ring-fail ring-inset" : isAnswer ? "bg-pass-soft ring-2 ring-pass ring-inset" : on ? "bg-accent-soft ring-2 ring-accent ring-inset" : "bg-surface ring-[1.5px] ring-line-2 ring-inset hover:bg-surface-2"
+                }`}
               >
-                <span className="mt-0.5 font-mono text-xs text-muted">{o.key}</span>
-                <span>{o.text}</span>
+                <span className={`mt-px grid h-6 w-6 shrink-0 place-items-center rounded-lg font-mono text-xs font-bold ${on ? "bg-accent text-on-accent" : "bg-surface-2 text-muted"}`}>{o.key}</span>
+                <span className="min-w-0 flex-1">{o.text}</span>
+                {isAnswer && <Icon name="check" size={18} strokeWidth={2.6} className="mt-0.5 shrink-0 text-pass" />}
               </button>
             </li>
           );
         })}
       </ul>
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <Button size="sm" onClick={grade} disabled={!selected.length}>
           채점
         </Button>
-        {graded === true && <span className="text-sm font-medium text-pass">정답</span>}
-        {graded === false && <span className="text-sm font-medium text-fail">오답. 다시 골라 보세요.</span>}
+        {graded !== null && <Verdict pass={graded}>{graded ? null : "다시 골라 보세요."}</Verdict>}
       </div>
-      {graded !== null && problem.explanation && <div className="space-y-2 rounded-xl border border-line bg-surface p-4">{renderText(problem.explanation)}</div>}
+      {graded !== null && problem.explanation && <Explanation text={problem.explanation} />}
     </div>
   );
 }

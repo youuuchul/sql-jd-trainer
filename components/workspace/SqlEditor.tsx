@@ -9,15 +9,15 @@ import type { Dialect, SchemaDef } from "@/lib/content/types";
 
 const theme = EditorView.theme(
   {
-    "&": { backgroundColor: "var(--color-bg)", color: "var(--color-fg)" },
+    "&": { backgroundColor: "var(--color-code-bg)", color: "var(--color-code-fg)" },
     ".cm-content": { caretColor: "var(--color-fg)", padding: "12px 0" },
     ".cm-cursor, .cm-dropCursor": { borderLeftColor: "var(--color-fg)" },
     "&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground, .cm-selectionBackground, ::selection": {
       backgroundColor: "color-mix(in srgb, var(--color-accent) 35%, transparent)",
     },
     ".cm-activeLine": { backgroundColor: "color-mix(in srgb, var(--color-fg) 4%, transparent)" },
-    ".cm-gutters": { backgroundColor: "var(--color-bg)", color: "var(--color-muted)", border: "none", paddingLeft: "6px" },
-    ".cm-activeLineGutter": { backgroundColor: "transparent", color: "var(--color-fg)" },
+    ".cm-gutters": { backgroundColor: "var(--color-code-bg)", color: "var(--color-faint)", border: "none", paddingLeft: "6px" },
+    ".cm-activeLineGutter": { backgroundColor: "transparent", color: "var(--color-fg-2)" },
     ".cm-lineNumbers .cm-gutterElement": { minWidth: "2.4em" },
     ".cm-matchingBracket": { backgroundColor: "color-mix(in srgb, var(--color-accent) 25%, transparent)", outline: "none" },
   },
