@@ -20,7 +20,7 @@ export default async function SetPage({ params }: PageProps<"/sets/[set]">) {
 function SetView({ set, schema, problems }: { set: ProblemSet; schema: SchemaDef | undefined; problems: Problem[] }) {
   return (
     <div className="mx-auto w-full max-w-3xl px-5 py-10">
-      <Link href="/" className="text-xs text-muted hover:text-fg">
+      <Link href="/practice" className="text-xs text-muted hover:text-fg">
         ← 문제 세트
       </Link>
       <div className="mt-3 flex flex-wrap items-center gap-2">
