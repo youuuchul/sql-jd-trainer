@@ -5,7 +5,7 @@ import { SetCategorySchema } from "./types";
 
 /**
  * 진행 경로용 세트 요약. 분류 순서(SetCategorySchema.options) → set.order 로 정렬한다.
- * 잠긴 스키마의 세트는 문제 제목을 내보내지 않는다(problems 빈 배열, problemCount 만).
+ * 잠긴 스키마의 세트는 문제 제목·도메인을 내보내지 않는다(problems 빈 배열, domain 빈 문자열, problemCount 만).
  *
  * Args:
  *   unlocked: 요청이 잠금 해제 쿠키를 가졌을 때 true. 잠긴 세트도 문제를 싣는다.
@@ -36,7 +36,7 @@ export const listPathSets = async ({ unlocked = false }: { unlocked?: boolean } 
         category: s.category,
         order: s.order,
         mode: s.mode,
-        domain: schema?.domain ?? "",
+        domain: hidden ? "" : (schema?.domain ?? ""),
         locked: hidden,
         problemCount: s.problems.length,
         problems: items,
