@@ -1,13 +1,17 @@
 "use client";
 import { useCallback, useState, type ReactNode } from "react";
-import { Button } from "@/components/ui-lab/components/button/Button";
-import { Tabs } from "@/components/ui-lab/components/tabs/Tabs";
+import { Button } from "@/components/ui/Button";
+import { Chip } from "@/components/ui/Chip";
+import { Icon } from "@/components/ui/icons";
+import { CodeBlock, Explanation } from "@/components/practice/Explanation";
+import { UTabs } from "@/components/practice/UTabs";
 import { DIALECT_LABEL, REVIEW_CATEGORIES, REVIEW_CATEGORY, type Dialect, type Problem, type ReviewCategory, type ReviewDecoy, type ReviewDefect, type SchemaDef } from "@/lib/content/types";
 import { QueryError, type QueryResult } from "@/lib/engine";
 import { gradeReview, reviewDecoys, reviewDefects, type DefectStatus, type MarkVerdict } from "@/lib/grading";
 import { useProblemProgress, type ReviewMark } from "@/lib/progress";
-import { renderText } from "@/lib/text";
-import { DialectSelector } from "./DialectSelector";
+import { DialectSelector, EngineStatusLabel } from "./DialectSelector";
+import { Verdict } from "./GradeBanner";
+import { CODE_BOX, ERROR_BOX, PANE } from "./panes";
 import { ResultGrid } from "./ResultGrid";
 import { SqlEditor } from "./SqlEditor";
 import type { EngineStatus } from "./useEngine";
@@ -21,10 +25,15 @@ export interface ReviewProblemProps {
   execute: (sql: string) => Promise<QueryResult>;
   mode: "practice" | "mock";
   onGraded?: (passed: boolean) => void;
+  /** 데스크톱이면 가운데 칸과 오른쪽 칸을 형제 요소로 돌려준다(부모 격자의 두 칸을 차지) */
+  desktop: boolean;
+  /** 오른쪽 칸의 스키마 탭 내용 */
+  schemaPanel: ReactNode;
 }
 
 const VERDICT_LABEL: Record<MarkVerdict, string> = { hit: "맞음", "wrong-type": "유형 다름", false: "결함 아님" };
 const STATUS_LABEL: Record<DefectStatus, string> = { found: "찾음", "wrong-type": "유형 다름", missed: "놓침" };
+const STATUS_TONE: Record<DefectStatus, "pass" | "warn" | "fail"> = { found: "pass", "wrong-type": "warn", missed: "fail" };
 
 const TOKEN = /'(?:[^']|'')*'|\b\d+(?:\.\d+)?\b|\b[A-Z][A-Z0-9_]*\b/g;
 
@@ -59,32 +68,23 @@ const byLine = <T extends { lines: Partial<Record<Dialect, number[]>> }>(refs: T
   return map;
 };
 
-const lineTone = (mark: ReviewMark | undefined, verdict: MarkVerdict | undefined, missed: boolean) => {
-  if (verdict === "hit") return "border-pass bg-pass/10";
-  if (verdict === "wrong-type") return "border-warn bg-warn/10";
-  if (verdict === "false") return "border-fail bg-fail/10";
-  if (mark) return "border-accent bg-accent/10";
-  if (missed) return "border-fail/70 bg-fail/[0.06]";
-  return "border-transparent hover:bg-fg/5";
-};
-
 export function ReviewChecklist() {
   return (
-    <section>
-      <h2 className="mb-1.5 text-xs font-semibold tracking-wide text-muted uppercase">리뷰 체크리스트</h2>
-      <ul className="space-y-1 text-[13px] leading-relaxed">
+    <section className="mt-[18px]">
+      <h2 className="text-[12.5px] font-bold tracking-[0.01em] text-muted">리뷰 체크리스트</h2>
+      <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-[7px] text-[13px] leading-[1.5]">
         {REVIEW_CATEGORIES.map((c) => (
-          <li key={c} className="flex gap-2">
-            <span className="w-[4.75rem] shrink-0 font-medium text-fg/90">{REVIEW_CATEGORY[c].label}</span>
-            <span className="text-muted">{REVIEW_CATEGORY[c].cue}</span>
-          </li>
+          <div key={c} className="contents">
+            <dt className="font-bold whitespace-nowrap">{REVIEW_CATEGORY[c].label}</dt>
+            <dd className="font-medium text-muted">{REVIEW_CATEGORY[c].cue}</dd>
+          </div>
         ))}
-      </ul>
+      </dl>
     </section>
   );
 }
 
-export function ReviewProblem({ problem, schema, dialect, onDialectChange, status, execute, mode, onGraded }: ReviewProblemProps) {
+export function ReviewProblem({ problem, schema, dialect, onDialectChange, status, execute, mode, onGraded, desktop, schemaPanel }: ReviewProblemProps) {
   const [progress, update] = useProblemProgress(problem.id);
   const [active, setActive] = useState<number | null>(null);
   const [gradedKey, setGradedKey] = useState<string | null>(null);
@@ -92,6 +92,7 @@ export function ReviewProblem({ problem, schema, dialect, onDialectChange, statu
   const [checkSql, setCheckSql] = useState("");
   const [check, setCheck] = useState<{ dialect: Dialect; result?: QueryResult; error?: string } | null>(null);
   const [running, setRunning] = useState(false);
+  const [asideTab, setAsideTab] = useState<{ value: string; answered: boolean } | null>(null);
 
   const runCheck = useCallback(async () => {
     if (!checkSql.trim() || running) return;
@@ -130,6 +131,11 @@ export function ReviewProblem({ problem, schema, dialect, onDialectChange, statu
     saveMarks(marks.filter((m) => m.line !== line));
     setActive(null);
   };
+  const resetMarks = () => {
+    saveMarks([]);
+    setGradedKey(null);
+    setActive(null);
+  };
 
   const submit = () => {
     const g = gradeReview(review, dialect, marks);
@@ -140,95 +146,196 @@ export function ReviewProblem({ problem, schema, dialect, onDialectChange, statu
   };
 
   const answer = showAnswer ? gradeReview(review, dialect, marks) : null;
+  const decoyList = answer ? reviewDecoys(review, dialect) : [];
 
-  return (
-    <div className="flex flex-col gap-3">
-      <DialectSelector value={dialect} onChange={onDialectChange} status={status} />
-      <div className="rounded-xl border border-line bg-surface">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-3 py-2">
-          <p className="text-xs font-semibold text-muted">검토할 쿼리 · 결함이 있는 줄을 누르고 유형을 고르세요</p>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-muted">{marks.length}줄 표시</span>
-            <Button size="sm" onClick={submit} disabled={marks.length === 0}>
-              채점
-            </Button>
-          </div>
-        </div>
-        <div className="bg-bg">
-          <ol className="py-2 font-mono text-[12.5px] leading-relaxed">
-            {lines.map((text, i) => {
-              const n = i + 1;
-              const mark = marks.find((m) => m.line === n);
-              const verdict = mark ? verdicts?.[n] : undefined;
-              const defect = showAnswer ? defectAt.get(n) : undefined;
-              const decoy = showAnswer ? decoyAt.get(n) : undefined;
-              return (
-                <li key={n}>
-                  <button
-                    type="button"
-                    onClick={() => setActive((a) => (a === n ? null : n))}
-                    aria-pressed={Boolean(mark)}
-                    aria-expanded={active === n}
-                    aria-label={`${n}번째 줄`}
-                    className={`flex w-full items-start gap-3 border-l-2 py-0.5 pr-3 pl-2 text-left transition-colors ${lineTone(mark, verdict, Boolean(defect && !mark))}`}
-                  >
-                    <span className="w-6 shrink-0 pt-px text-right text-[11px] text-muted tabular-nums select-none">{n}</span>
-                    <span className="min-w-0 flex-1 break-words whitespace-pre-wrap text-fg">{highlightLine(text)}</span>
-                    {mark && (
-                      <span className={`ml-4 shrink-0 rounded-md px-1.5 py-0.5 font-sans text-[11px] font-medium ${verdict === "hit" ? "bg-pass/20 text-pass" : verdict === "wrong-type" ? "bg-warn/20 text-warn" : verdict === "false" ? "bg-fail/20 text-fail" : "bg-accent/20 text-accent"}`}>
-                        {REVIEW_CATEGORY[mark.category].label}
-                        {verdict && ` · ${VERDICT_LABEL[verdict]}`}
-                        {defect && defect.category !== mark.category && ` → ${REVIEW_CATEGORY[defect.category].label}`}
-                      </span>
-                    )}
-                    {!mark && defect && <span className="ml-4 shrink-0 rounded-md bg-fail/20 px-1.5 py-0.5 font-sans text-[11px] font-medium text-fail">놓침 · {REVIEW_CATEGORY[defect.category].label}</span>}
-                    {!mark && decoy && <span className="ml-4 shrink-0 rounded-md bg-fg/10 px-1.5 py-0.5 font-sans text-[11px] text-fg/70">맞는 줄</span>}
-                  </button>
-                  {active === n && (
-                    <div role="radiogroup" aria-label={`${n}번째 줄 결함 유형`} className="flex flex-wrap items-center gap-1.5 border-l-2 border-accent bg-surface-2 py-2 pr-3 pl-11 font-sans">
-                      {REVIEW_CATEGORIES.map((c) => (
-                        <button
-                          key={c}
-                          type="button"
-                          role="radio"
-                          aria-checked={mark?.category === c}
-                          onClick={() => setMark(n, c)}
-                          className={`h-7 rounded-lg px-2.5 text-xs font-medium transition-colors ${mark?.category === c ? "bg-accent text-white" : "bg-fg/10 text-fg/85 hover:bg-fg/15"}`}
-                        >
-                          {REVIEW_CATEGORY[c].label}
-                        </button>
-                      ))}
-                      {mark && (
-                        <button type="button" onClick={() => clearMark(n)} className="ml-1 h-7 px-1.5 text-xs text-muted hover:text-fg">
-                          표시 지우기
-                        </button>
-                      )}
+  const asideItems = [
+    ...(answer
+      ? [
+          {
+            value: "defects",
+            label: `결함 ${answer.total}`,
+            content: (
+              <ul>
+                {answer.defects.map(({ defect, status: st }) => (
+                  <li key={defect.title} className="border-b border-line py-3.5 first:pt-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Chip size="sm" tone="fail">
+                        {REVIEW_CATEGORY[defect.category].label}
+                      </Chip>
+                      <span className="font-mono text-xs text-muted">줄 {(defect.lines[dialect] ?? []).join(", ")}</span>
+                      <Chip size="sm" tone={STATUS_TONE[st]}>
+                        {STATUS_LABEL[st]}
+                      </Chip>
                     </div>
-                  )}
-                </li>
-              );
-            })}
-          </ol>
+                    <h3 className="mt-2 text-[14.5px] leading-[1.4] font-extrabold tracking-[-0.02em]">{defect.title}</h3>
+                    <p className="mt-1 text-[13px] leading-[1.6] text-fg-2">{defect.explanation}</p>
+                  </li>
+                ))}
+              </ul>
+            ),
+          },
+          ...(decoyList.length
+            ? [
+                {
+                  value: "decoys",
+                  label: `맞는 줄 ${decoyList.length}`,
+                  content: (
+                    <ul>
+                      {decoyList.map((d) => (
+                        <li key={d.explanation} className="border-b border-line py-3.5 first:pt-1">
+                          <span className="font-mono text-xs text-muted">줄 {(d.lines[dialect] ?? []).join(", ")}</span>
+                          <p className="mt-1 text-[13px] leading-[1.6] text-fg-2">{d.explanation}</p>
+                        </li>
+                      ))}
+                    </ul>
+                  ),
+                },
+              ]
+            : []),
+        ]
+      : []),
+    { value: "schema", label: "스키마", content: schemaPanel },
+  ];
+  const tab = asideTab && asideTab.answered === Boolean(answer) ? asideTab.value : answer ? "defects" : "schema";
+  const aside = (
+    <div className="min-w-0">
+      <UTabs label="리뷰 결과" size="sm" items={asideItems} value={tab} onChange={(value) => setAsideTab({ value, answered: Boolean(answer) })} panelClassName="pt-3" />
+      {answer && problem.explanation && (
+        <div className="mt-4">
+          <Explanation text={problem.explanation}>{problem.dialectNotes?.[dialect] && <p className="text-[12.5px] leading-relaxed font-medium text-muted">{problem.dialectNotes[dialect]}</p>}</Explanation>
         </div>
+      )}
+    </div>
+  );
+
+  const mid = (
+    <div className="flex min-w-0 flex-col gap-3">
+      <div className="flex flex-wrap items-center gap-3">
+        <DialectSelector value={dialect} onChange={onDialectChange} />
+        {grade ? (
+          <span className="flex items-center gap-1.5 text-[13px] font-semibold text-muted">
+            <span className={`inline-block h-[7px] w-[7px] rounded-full ${grade.pass ? "bg-pass" : "bg-fail"}`} aria-hidden="true" />
+            채점 완료
+          </span>
+        ) : (
+          <EngineStatusLabel status={status} />
+        )}
+        <span className="ml-auto flex items-center gap-2">
+          {grade && (
+            <Button size="sm" tone="ghost" onClick={resetMarks}>
+              표시 다시 하기
+            </Button>
+          )}
+          <Button size="sm" onClick={submit} disabled={marks.length === 0}>
+            채점
+          </Button>
+        </span>
+      </div>
+      <div className="overflow-hidden rounded-2xl bg-code-bg py-2 text-code-fg ring-1 ring-line ring-inset">
+        <div className="mb-1.5 flex items-center justify-between border-b border-line px-4 pt-1 pb-2.5 text-[12.5px] font-semibold text-muted">
+          <span>검토할 쿼리</span>
+          <span>표시 {marks.length}줄</span>
+        </div>
+        <ol className="font-mono text-[13.5px] leading-[30px]">
+          {lines.map((text, i) => {
+            const n = i + 1;
+            const mark = marks.find((m) => m.line === n);
+            const verdict = mark ? verdicts?.[n] : undefined;
+            const defect = showAnswer ? defectAt.get(n) : undefined;
+            const decoy = showAnswer ? decoyAt.get(n) : undefined;
+            const missed = Boolean(defect && !mark);
+            const note = mark || missed || decoy;
+            return (
+              <li key={n}>
+                <button
+                  type="button"
+                  onClick={() => setActive((a) => (a === n ? null : n))}
+                  aria-pressed={Boolean(mark)}
+                  aria-expanded={active === n}
+                  aria-label={`${n}번째 줄`}
+                  className={`block w-full text-left transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent ${missed ? "bg-fail-soft shadow-[inset_3px_0_0_var(--color-fail)]" : mark ? "bg-accent-soft shadow-[inset_3px_0_0_var(--color-accent)]" : "hover:bg-surface-2/60"}`}
+                >
+                  <span className="grid grid-cols-[46px_1fr] pr-3.5">
+                    <span className={`pr-4 text-right text-[12.5px] select-none ${missed ? "font-bold text-fail-ink" : mark ? "font-bold text-accent-ink" : "text-faint"}`}>{n}</span>
+                    <span className="min-w-0 overflow-x-auto whitespace-pre [scrollbar-width:none]">{highlightLine(text)}</span>
+                  </span>
+                  {note && (
+                    <span className="flex flex-wrap items-center gap-1.5 pb-1.5 pl-[62px] font-sans leading-normal">
+                      {mark && (
+                        <>
+                          <Chip size="sm" tone={verdict ? "neutral" : "accent"} className={verdict && verdict !== "hit" ? "line-through decoration-[1.5px] opacity-75" : ""}>
+                            {REVIEW_CATEGORY[mark.category].label}
+                          </Chip>
+                          {verdict && (
+                            <>
+                              <span aria-hidden="true" className="text-xs text-faint">
+                                →
+                              </span>
+                              <Chip size="sm" tone={verdict === "hit" ? "pass" : verdict === "wrong-type" ? "warn" : "neutral"}>
+                                {verdict === "hit" && <Icon name="check" size={13} strokeWidth={2.6} />}
+                                {VERDICT_LABEL[verdict]}
+                                {verdict === "wrong-type" && defect && defect.category !== mark.category && ` · ${REVIEW_CATEGORY[defect.category].label}`}
+                              </Chip>
+                            </>
+                          )}
+                        </>
+                      )}
+                      {missed && defect && (
+                        <Chip size="sm" tone="fail">
+                          놓침 · {REVIEW_CATEGORY[defect.category].label}
+                        </Chip>
+                      )}
+                      {!mark && decoy && <Chip size="sm">맞는 줄</Chip>}
+                    </span>
+                  )}
+                </button>
+                {active === n && (
+                  <div role="radiogroup" aria-label={`${n}번째 줄 결함 유형`} className="flex flex-wrap items-center gap-1.5 bg-surface-2 py-2.5 pr-3.5 pl-[62px] font-sans leading-normal">
+                    {REVIEW_CATEGORIES.map((c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        role="radio"
+                        aria-checked={mark?.category === c}
+                        onClick={() => setMark(n, c)}
+                        className={`h-8 rounded-[10px] px-3 text-[12.5px] font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-accent ${mark?.category === c ? "bg-accent text-on-accent" : "bg-surface text-fg-2 ring-1 ring-line-2 ring-inset hover:bg-surface-3"}`}
+                      >
+                        {REVIEW_CATEGORY[c].label}
+                      </button>
+                    ))}
+                    {mark && (
+                      <button type="button" onClick={() => clearMark(n)} className="ml-1 h-8 px-1.5 text-[12.5px] font-semibold text-muted hover:text-fg">
+                        표시 지우기
+                      </button>
+                    )}
+                  </div>
+                )}
+              </li>
+            );
+          })}
+        </ol>
       </div>
       {grade && (
-        <div className={`flex flex-wrap items-center gap-3 rounded-xl border px-4 py-2.5 text-sm ${grade.pass ? "border-pass/40 bg-pass/10" : "border-fail/40 bg-fail/10"}`}>
-          <span className={`inline-block h-2 w-2 rounded-full ${grade.pass ? "bg-pass" : "bg-fail"}`} aria-hidden="true" />
-          <span className={`font-medium ${grade.pass ? "text-pass" : "text-fail"}`}>{grade.pass ? "정답" : "오답"}</span>
-          <span className="text-muted">
+        <Verdict
+          pass={grade.pass}
+          action={
+            mode === "practice" && !showAnswer ? (
+              <Button size="xs" tone="ghost" onClick={() => setRevealed(true)}>
+                정답 보기
+              </Button>
+            ) : undefined
+          }
+        >
+          <span>
             결함 {grade.total}개 중 {grade.found}개 찾음{grade.wrongType > 0 && ` · 유형 다름 ${grade.wrongType}줄`}
             {grade.falseMarks > 0 && ` · 결함 아님 ${grade.falseMarks}줄`}
           </span>
-          {mode === "practice" && !showAnswer && (
-            <Button size="sm" variant="secondary" className="ml-auto" onClick={() => setRevealed(true)}>
-              정답 보기
-            </Button>
-          )}
-        </div>
+        </Verdict>
       )}
-      <div className="rounded-xl border border-line bg-surface">
-        <Tabs
+      <div className="overflow-hidden rounded-2xl bg-surface ring-1 ring-line ring-inset">
+        <UTabs
           label="결과 보기"
+          listClassName="px-4"
           items={[
             ...(result
               ? [
@@ -243,20 +350,19 @@ export function ReviewProblem({ problem, schema, dialect, onDialectChange, statu
               value: "check",
               label: "검증 쿼리",
               content: (
-                <div className="space-y-2 p-3">
-                  <div className="h-36 overflow-hidden rounded-lg border border-line bg-bg">
+                <div className="space-y-2.5 p-3.5">
+                  <div className={`h-36 ${CODE_BOX}`}>
                     <SqlEditor value={checkSql} onChange={setCheckSql} dialect={dialect} onRun={runCheck} schema={schema} />
                   </div>
                   <div className="flex justify-end">
-                    <Button size="sm" onClick={runCheck} loading={running} disabled={status.state !== "ready" || !checkSql.trim()}>
-                      실행 <span className="ml-1 font-mono text-[11px] opacity-70">⌘↩</span>
+                    <Button size="sm" onClick={runCheck} disabled={running || status.state !== "ready" || !checkSql.trim()}>
+                      <Icon name="play" size={16} filled />
+                      {running ? "실행 중" : "실행"} <span className="font-mono text-[11px] opacity-70">⌘↩</span>
                     </Button>
                   </div>
-                  {check?.dialect === dialect && check.error && (
-                    <pre className="rounded-lg border border-fail/40 bg-fail/10 px-3 py-2 font-mono text-[12.5px] leading-relaxed whitespace-pre-wrap text-fail">{check.error}</pre>
-                  )}
+                  {check?.dialect === dialect && check.error && <pre className={ERROR_BOX}>{check.error}</pre>}
                   {check?.dialect === dialect && check.result && (
-                    <div className="rounded-lg border border-line">
+                    <div className="overflow-hidden rounded-xl ring-1 ring-line ring-inset">
                       <ResultGrid columns={check.result.columns} rows={check.result.rows} caption="검증 쿼리 결과" truncated={check.result.truncated} />
                     </div>
                   )}
@@ -267,53 +373,37 @@ export function ReviewProblem({ problem, schema, dialect, onDialectChange, statu
               ? [
                   { value: "expected", label: `올바른 결과 ${expected.rows.length}행`, content: <ResultGrid columns={expected.columns} rows={expected.rows} caption="올바른 결과" /> },
                   ...(solution
-                    ? [{ value: "solution", label: `올바른 쿼리 · ${DIALECT_LABEL[dialect]}`, content: <pre className="overflow-x-auto p-3 font-mono text-[12.5px] leading-relaxed">{solution}</pre> }]
+                    ? [
+                        {
+                          value: "solution",
+                          label: `올바른 쿼리 · ${DIALECT_LABEL[dialect]}`,
+                          content: (
+                            <div className="p-3.5">
+                              <CodeBlock code={solution} />
+                            </div>
+                          ),
+                        },
+                      ]
                     : []),
                 ]
               : []),
           ]}
         />
       </div>
-      {answer && (
-        <section className="space-y-4 rounded-xl border border-line bg-surface p-4">
-          <div className="space-y-3">
-            <h2 className="text-xs font-semibold tracking-wide text-muted uppercase">결함 {answer.total}개</h2>
-            <ul className="space-y-3">
-              {answer.defects.map(({ defect, status: st }) => (
-                <li key={defect.title} className="text-[13px] leading-relaxed">
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <span className="rounded-md bg-fail/15 px-1.5 py-0.5 text-[11px] font-medium text-fail">{REVIEW_CATEGORY[defect.category].label}</span>
-                    <span className="font-mono text-[11px] text-muted">줄 {(defect.lines[dialect] ?? []).join(", ")}</span>
-                    <span className={`text-[11px] font-medium ${st === "found" ? "text-pass" : st === "wrong-type" ? "text-warn" : "text-muted"}`}>{STATUS_LABEL[st]}</span>
-                  </div>
-                  <p className="mt-1 font-medium text-fg">{defect.title}</p>
-                  <p className="text-fg/80">{defect.explanation}</p>
-                </li>
-              ))}
-            </ul>
-          </div>
-          {decoyAt.size > 0 && (
-            <div className="space-y-2 border-t border-line pt-3">
-              <h3 className="text-xs font-semibold text-muted">맞는 줄</h3>
-              <ul className="space-y-1.5">
-                {reviewDecoys(review, dialect).map((d) => (
-                  <li key={d.explanation} className="text-[13px] leading-relaxed text-fg/80">
-                    <span className="mr-1.5 font-mono text-[11px] text-muted">줄 {(d.lines[dialect] ?? []).join(", ")}</span>
-                    {d.explanation}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-          {problem.explanation && (
-            <div className="space-y-3 border-t border-line pt-3">
-              <h3 className="text-xs font-semibold tracking-wide text-muted uppercase">해설</h3>
-              {renderText(problem.explanation)}
-              {problem.dialectNotes?.[dialect] && <p className="text-[12.5px] leading-relaxed text-muted">{problem.dialectNotes[dialect]}</p>}
-            </div>
-          )}
-        </section>
-      )}
+    </div>
+  );
+
+  if (desktop)
+    return (
+      <>
+        <section className="flex min-h-0 min-w-0 flex-col overflow-y-auto">{mid}</section>
+        <aside className={`${PANE} p-[18px]`}>{aside}</aside>
+      </>
+    );
+  return (
+    <div className="flex flex-col gap-4">
+      {mid}
+      <section className="rounded-2xl bg-surface p-4 ring-1 ring-line ring-inset">{aside}</section>
     </div>
   );
 }

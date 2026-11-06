@@ -1,11 +1,12 @@
 "use client";
 import { useState } from "react";
-import { Button } from "@/components/ui-lab/components/button/Button";
-import { Tabs } from "@/components/ui-lab/components/tabs/Tabs";
+import { Button } from "@/components/ui/Button";
+import { CodeBlock, Explanation } from "@/components/practice/Explanation";
+import { UTabs } from "@/components/practice/UTabs";
 import { DIALECT_LABEL, type Dialect, type Problem } from "@/lib/content/types";
 import { useProblemProgress, useProgressStore } from "@/lib/progress";
-import { renderText } from "@/lib/text";
 import { DialectSelector } from "./DialectSelector";
+import { Verdict } from "./GradeBanner";
 import { ResultGrid } from "./ResultGrid";
 import { SqlEditor } from "./SqlEditor";
 import type { EngineStatus } from "./useEngine";
@@ -69,14 +70,14 @@ export function SpotProblem({ problem, dialect, onDialectChange, status, mode, o
   return (
     <div className="flex flex-col gap-3">
       <DialectSelector value={dialect} onChange={onDialectChange} status={status} />
-      <div className="min-h-[10rem] overflow-hidden rounded-xl border border-line bg-bg">
+      <div className="min-h-[10rem] overflow-hidden rounded-2xl bg-code-bg ring-1 ring-line ring-inset">
         <SqlEditor value={sql} onChange={() => {}} dialect={dialect} readOnly />
       </div>
-      <div className="rounded-xl border border-line bg-surface">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-3 py-2">
-          <p className="text-xs font-semibold text-muted">쿼리 결과 {spot.rows.length}행 · 잘못된 행을 고르세요</p>
+      <div className="overflow-hidden rounded-2xl bg-surface ring-1 ring-line ring-inset">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-3.5 py-2.5">
+          <p className="text-[12.5px] font-bold text-muted">쿼리 결과 {spot.rows.length}행 · 잘못된 행을 고르세요</p>
           <div className="flex items-center gap-2">
-            <span className="text-xs text-muted">{selected.size}행 선택</span>
+            <span className="text-xs font-medium text-muted">{selected.size}행 선택</span>
             <Button size="sm" onClick={submit} disabled={selected.size === 0}>
               채점
             </Button>
@@ -85,18 +86,15 @@ export function SpotProblem({ problem, dialect, onDialectChange, status, mode, o
         <ResultGrid columns={spot.columns} rows={spot.rows} caption="잘못된 쿼리의 결과" selected={selected} onToggle={toggle} highlight={highlight} />
       </div>
       {grade && (
-        <div className={`flex items-center gap-3 rounded-xl border px-4 py-2.5 text-sm ${grade.pass ? "border-pass/40 bg-pass/10" : "border-fail/40 bg-fail/10"}`}>
-          <span className={`inline-block h-2 w-2 rounded-full ${grade.pass ? "bg-pass" : "bg-fail"}`} aria-hidden="true" />
-          <span className={`font-medium ${grade.pass ? "text-pass" : "text-fail"}`}>{grade.pass ? "정답" : "오답"}</span>
-          <span className="text-muted">
-            이상 행 {grade.total}개 중 {grade.hit}개를 찾았고 {grade.wrong}개를 잘못 골랐습니다.
-          </span>
-        </div>
+        <Verdict pass={grade.pass}>
+          이상 행 {grade.total}개 중 {grade.hit}개를 찾았고 {grade.wrong}개를 잘못 골랐습니다.
+        </Verdict>
       )}
       {showAnswer && (
-        <div className="rounded-xl border border-line bg-surface">
-          <Tabs
+        <div className="overflow-hidden rounded-2xl bg-surface ring-1 ring-line ring-inset">
+          <UTabs
             label="정답 보기"
+            listClassName="px-4"
             items={[
               { value: "expected", label: `올바른 결과 ${expected.rows.length}행`, content: <ResultGrid columns={expected.columns} rows={expected.rows} caption="올바른 결과" /> },
               ...(solution
@@ -104,7 +102,7 @@ export function SpotProblem({ problem, dialect, onDialectChange, status, mode, o
                     {
                       value: "solution",
                       label: `올바른 쿼리 · ${DIALECT_LABEL[dialect]}`,
-                      content: <pre className="overflow-x-auto p-3 font-mono text-[12.5px] leading-relaxed">{solution}</pre>,
+                      content: <CodeBlock code={solution} />,
                     },
                   ]
                 : []),
@@ -113,11 +111,7 @@ export function SpotProblem({ problem, dialect, onDialectChange, status, mode, o
         </div>
       )}
       {showAnswer && problem.explanation && (
-        <section className="space-y-3 rounded-xl border border-line bg-surface p-4">
-          <h2 className="text-xs font-semibold tracking-wide text-muted uppercase">해설</h2>
-          {renderText(problem.explanation)}
-          {problem.dialectNotes?.[dialect] && <p className="text-[12.5px] leading-relaxed text-muted">{problem.dialectNotes[dialect]}</p>}
-        </section>
+        <Explanation text={problem.explanation}>{problem.dialectNotes?.[dialect] && <p className="text-[12.5px] leading-relaxed font-medium text-muted">{problem.dialectNotes[dialect]}</p>}</Explanation>
       )}
     </div>
   );

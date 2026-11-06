@@ -1,12 +1,12 @@
 "use client";
 import { useState } from "react";
-import { Button } from "@/components/ui-lab/components/button/Button";
-import { Tabs } from "@/components/ui-lab/components/tabs/Tabs";
+import { Button } from "@/components/ui/Button";
+import { Explanation } from "@/components/practice/Explanation";
+import { UTabs } from "@/components/practice/UTabs";
 import { DIALECT_LABEL, type Cell, type Dialect, type Problem } from "@/lib/content/types";
 import { QueryError, type QueryResult } from "@/lib/engine";
 import { compareResult, type CompareResult } from "@/lib/grading";
 import { useProblemProgress, useProgressStore } from "@/lib/progress";
-import { renderText } from "@/lib/text";
 import { DialectSelector } from "./DialectSelector";
 import { GradeBanner } from "./GradeBanner";
 import { ResultGrid } from "./ResultGrid";
@@ -79,17 +79,17 @@ export function PredictProblem({ problem, dialect, onDialectChange, status, exec
   return (
     <div className="flex flex-col gap-3">
       <DialectSelector value={dialect} onChange={onDialectChange} status={status} />
-      <div className="rounded-xl border border-line bg-surface">
-        <p className="border-b border-line px-3 py-2 text-xs font-semibold text-muted">{problem.input.title}</p>
+      <div className="overflow-hidden rounded-2xl bg-surface ring-1 ring-line ring-inset">
+        <p className="border-b border-line px-3.5 py-2.5 text-[12.5px] font-bold text-muted">{problem.input.title}</p>
         <ResultGrid columns={problem.input.columns} rows={problem.input.rows} caption={problem.input.title} />
       </div>
-      <div className="min-h-[10rem] overflow-hidden rounded-xl border border-line bg-bg">
+      <div className="min-h-[10rem] overflow-hidden rounded-2xl bg-code-bg ring-1 ring-line ring-inset">
         <SqlEditor value={sql} onChange={() => {}} dialect={dialect} readOnly />
       </div>
-      <div className="rounded-xl border border-line bg-surface p-3">
+      <div className="rounded-2xl bg-surface p-3.5 ring-1 ring-line ring-inset">
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
           <p className="font-mono text-xs text-muted">{expected.columns.join(", ")}</p>
-          <p className="text-xs text-muted">한 줄에 한 행, 값은 쉼표로 구분, 빈 값은 NULL</p>
+          <p className="text-xs font-medium text-muted">한 줄에 한 행, 값은 쉼표로 구분, 빈 값은 NULL</p>
         </div>
         <textarea
           value={text}
@@ -100,27 +100,28 @@ export function PredictProblem({ problem, dialect, onDialectChange, status, exec
           rows={Math.max(4, expected.rows.length + 1)}
           spellCheck={false}
           aria-label="예상 결과"
-          className="w-full rounded-lg border border-line bg-bg px-3 py-2 font-mono text-[12.5px] leading-relaxed text-fg outline-none focus:border-accent"
+          className="w-full rounded-xl bg-code-bg px-3 py-2.5 font-mono text-[12.5px] leading-relaxed text-code-fg ring-1 ring-line-2 outline-none ring-inset focus:ring-2 focus:ring-accent"
         />
         <div className="mt-2 flex items-center gap-2">
           <Button size="sm" onClick={grade} disabled={!text.trim()}>
             채점
           </Button>
           {graded && (
-            <Button size="sm" variant="secondary" onClick={runActual} loading={running} disabled={status.state !== "ready"}>
-              실행해서 확인
+            <Button size="sm" tone="ghost" onClick={runActual} disabled={running || status.state !== "ready"}>
+              {running ? "실행 중" : "실행해서 확인"}
             </Button>
           )}
         </div>
       </div>
       {cmp && <GradeBanner cmp={cmp} diagnoses={[]} ms={0} />}
       {actual?.error && (
-        <pre className="rounded-xl border border-fail/40 bg-fail/10 px-4 py-3 font-mono text-[12.5px] leading-relaxed whitespace-pre-wrap text-fail">{actual.error}</pre>
+        <pre className="rounded-2xl bg-fail-soft px-4 py-3 font-mono text-[12.5px] leading-relaxed whitespace-pre-wrap text-fail-ink ring-1 ring-fail/30 ring-inset">{actual.error}</pre>
       )}
       {(actual?.result || showAnswer) && (
-        <div className="rounded-xl border border-line bg-surface">
-          <Tabs
+        <div className="overflow-hidden rounded-2xl bg-surface ring-1 ring-line ring-inset">
+          <UTabs
             label="결과 보기"
+            listClassName="px-4"
             items={[
               ...(actual?.result
                 ? [{ value: "actual", label: `${DIALECT_LABEL[dialect]} 실행 결과 ${actual.result.rows.length}행`, content: <ResultGrid columns={actual.result.columns} rows={actual.result.rows} caption="실행 결과" /> }]
@@ -131,11 +132,7 @@ export function PredictProblem({ problem, dialect, onDialectChange, status, exec
         </div>
       )}
       {showAnswer && problem.explanation && (
-        <section className="space-y-3 rounded-xl border border-line bg-surface p-4">
-          <h2 className="text-xs font-semibold tracking-wide text-muted uppercase">해설</h2>
-          {renderText(problem.explanation)}
-          {problem.dialectNotes?.[dialect] && <p className="text-[12.5px] leading-relaxed text-muted">{problem.dialectNotes[dialect]}</p>}
-        </section>
+        <Explanation text={problem.explanation}>{problem.dialectNotes?.[dialect] && <p className="text-[12.5px] leading-relaxed font-medium text-muted">{problem.dialectNotes[dialect]}</p>}</Explanation>
       )}
     </div>
   );

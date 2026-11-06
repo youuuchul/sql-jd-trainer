@@ -20,7 +20,7 @@ const waitReady = async (page: Page) => {
 test("문제 풀이 흐름: PostgreSQL 정답·오답 진단·BigQuery·MySQL·진행 저장", async ({ page }) => {
   const p = problem("ba-01-where-in-compare");
   await page.goto("/practice");
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("라이브 쿼리");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("연습");
   await page.goto("/sets/basics-01-select-filter");
   await page.getByRole("link", { name: new RegExp(p.title) }).click();
   await expect(page).toHaveURL(new RegExp(`/problems/${p.id}`));
@@ -165,7 +165,7 @@ test("쿼리 리뷰: 유형 다름·오탐 채점, 정답 공개, 새로고침 �
   const other: ReviewCategory = d0.category === "duplicate" ? "fanout" : "duplicate";
 
   await page.goto("/practice");
-  await expect(page.getByRole("heading", { name: "쿼리 리뷰", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^쿼리 리뷰/ })).toBeVisible();
   await page.goto(`/sets/${reviewSet.id}`);
   await page.getByRole("link", { name: new RegExp(p.title) }).click();
   await expect(page).toHaveURL(new RegExp(`/problems/${p.id}`));
@@ -197,7 +197,8 @@ test("쿼리 리뷰: 유형 다름·오탐 채점, 정답 공개, 새로고침 �
   await expect(banner(page)).toHaveText(`결함 ${review.defects.length}개 중 ${review.defects.length}개 찾음`);
   for (const d of review.defects) await expect(page.getByText(d.title)).toBeVisible();
   await expect(page.getByRole("tab", { name: `올바른 결과 ${p.expected!.rows.length}행` })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "맞는 줄" })).toBeVisible();
+  await page.getByRole("tab", { name: /^맞는 줄/ }).click();
+  await expect(page.getByText(decoy.explanation)).toBeVisible();
 
   // 새로고침 후 표시 유지
   await page.reload();
