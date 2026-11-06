@@ -1,9 +1,11 @@
 "use client";
+import { useRouter } from "next/navigation";
 import { useState, useSyncExternalStore } from "react";
 import { ProblemList } from "@/components/ProblemList";
 import { Badge } from "@/components/ui-lab/components/badge/Badge";
 import { Button } from "@/components/ui-lab/components/button/Button";
 import { analyzeJd, recommendProblems, type Competency, type CompetencyMatch, type ProblemSummary } from "@/lib/jd/match";
+import { JD_MOCK_SET_ID, saveJdMockSet } from "@/lib/jd/mock-set";
 
 const KEY = "sjt:jd:v1";
 const listeners = new Set<() => void>();
@@ -24,6 +26,7 @@ const useSavedJd = () => {
 };
 
 export function JdAnalyzer({ competencies, problems }: { competencies: Competency[]; problems: ProblemSummary[] }) {
+  const router = useRouter();
   const [saved, save] = useSavedJd();
   const [draft, setDraft] = useState<string | null>(null);
   const text = draft ?? saved;
@@ -36,6 +39,11 @@ export function JdAnalyzer({ competencies, problems }: { competencies: Competenc
 
   const recs = matches ? recommendProblems(matches, problems) : [];
   const reasons = Object.fromEntries(recs.map((r) => [r.problem.id, r.reasons]));
+
+  const startMock = () => {
+    saveJdMockSet({ problems: recs.map((r) => r.problem.id), competencies: (matches ?? []).map((m) => m.competency.label) });
+    router.push(`/mock/${JD_MOCK_SET_ID}`);
+  };
 
   return (
     <div className="mt-6">
@@ -78,7 +86,12 @@ export function JdAnalyzer({ competencies, problems }: { competencies: Competenc
       )}
       {recs.length > 0 && (
         <section className="mt-8">
-          <h2 className="text-base font-semibold">추천 문제</h2>
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-base font-semibold">추천 문제</h2>
+            <Button size="sm" onClick={startMock}>
+              모의 시험 시작
+            </Button>
+          </div>
           <div className="mt-3">
             <ProblemList problems={recs.map((r) => r.problem)} reasons={reasons} />
           </div>
