@@ -2,14 +2,14 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "SQL JD Trainer",
-    short_name: "SQL 카드",
-    description: "데이터 분석가 라이브 쿼리 연습과 하루 SQL 카드",
-    start_url: "/daily",
+    name: "하루쿼리",
+    short_name: "하루쿼리",
+    description: "하루 SQL 카드와 데이터 분석가 라이브 쿼리 연습",
+    start_url: "/",
     scope: "/",
     display: "standalone",
-    background_color: "#111111",
-    theme_color: "#111111",
+    background_color: "#f4f7fc",
+    theme_color: "#f4f7fc",
     lang: "ko",
     icons: [
       { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },

@@ -3,6 +3,7 @@ import { Check, Lightbulb, X } from "lucide-react";
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { DIALECT_LABEL, type Card, type SyntaxRef } from "@/lib/content/types";
 import { isCorrect, splitTemplate, type DialectFilter, type Outcome } from "@/lib/daily/srs";
+import { useHideTabBar } from "@/components/shell/tabbar";
 
 export interface SessionCard extends Card {
   deckTitle: string;
@@ -38,6 +39,7 @@ const formsFor = (ref: SyntaxRef, cardDialect: Card["dialect"], filter: DialectF
 };
 
 export function CardSession({ queue: initial, syntax, dialectFilter, onAnswer, onExit }: Props) {
+  useHideTabBar();
   const [queue, setQueue] = useState(initial);
   const [pos, setPos] = useState(0);
   const [input, setInput] = useState("");
