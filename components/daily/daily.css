@@ -1,0 +1,13 @@
+.dq-caret {
+  animation: dq-blink 1s steps(1) infinite;
+}
+@keyframes dq-blink {
+  50% {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dq-caret {
+    animation: none;
+  }
+}
