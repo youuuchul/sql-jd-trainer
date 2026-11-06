@@ -1,17 +1,18 @@
 "use client";
-import { Lock } from "lucide-react";
 import { useActionState } from "react";
+import { Button } from "@/components/ui/Button";
+import { Icon } from "@/components/ui/icons";
 import { unlockAction, type UnlockState } from "@/lib/unlock/actions";
 
 export function UnlockForm({ title }: { title: string }) {
   const [state, action, pending] = useActionState<UnlockState, FormData>(unlockAction, { error: null });
   return (
     <div className="mx-auto flex w-full max-w-sm flex-1 flex-col items-center justify-center px-5 py-16">
-      <span className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-fg/10 text-muted">
-        <Lock size={18} aria-hidden="true" />
+      <span className="hq-card flat inline-flex h-16 w-16 items-center justify-center text-muted">
+        <Icon name="lock" size={28} />
       </span>
-      <h1 className="mt-4 text-center text-lg font-semibold tracking-tight">{title}</h1>
-      <form action={action} className="mt-6 flex w-full gap-2">
+      <h1 className="mt-5 text-center text-[22px] font-extrabold tracking-[-0.02em]">{title}</h1>
+      <form action={action} className="mt-7 flex w-full gap-2.5">
         <label htmlFor="unlock-password" className="sr-only">
           비밀번호
         </label>
@@ -24,13 +25,13 @@ export function UnlockForm({ title }: { title: string }) {
           autoFocus
           required
           placeholder="비밀번호"
-          className="h-10 min-w-0 flex-1 rounded-lg border border-line bg-surface px-3 text-sm outline-none focus:border-accent"
+          className="h-[52px] min-w-0 flex-1 rounded-[14px] bg-surface px-4 text-[16px] text-fg shadow-[inset_0_0_0_1.5px_var(--color-line)] outline-none placeholder:text-faint focus:shadow-[inset_0_0_0_2px_var(--color-accent)]"
         />
-        <button type="submit" disabled={pending} className="h-10 rounded-lg bg-accent px-4 text-sm font-semibold text-white hover:bg-accent/85 disabled:opacity-60">
+        <Button type="submit" disabled={pending}>
           열기
-        </button>
+        </Button>
       </form>
-      <p role="alert" className="mt-3 h-5 text-sm text-fail">
+      <p role="alert" className="mt-3 h-5 text-sm font-semibold text-fail-ink">
         {state.error}
       </p>
     </div>

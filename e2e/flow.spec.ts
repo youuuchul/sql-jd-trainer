@@ -249,12 +249,15 @@ test("공고 분석: 역량 태그와 추천 문제, 잠긴 문제 제외, 새�
   expect(recommended.length).toBeGreaterThan(0);
   for (const t of lockedTitles) expect(recommended.some((r) => r.includes(t)), `잠긴 문제가 추천에 보임: ${t}`).toBe(false);
   await page.reload();
-  await expect(box).toHaveValue(/퍼널 전환율/);
+  await expect(page.getByText(/퍼널 전환율을 분석하고/)).toBeVisible();
   await expect(funnel).toBeVisible();
+  await page.getByRole("button", { name: "수정" }).click();
+  await expect(box).toHaveValue(/퍼널 전환율/);
   await box.fill("점심 메뉴를 알려주세요.");
   await page.getByRole("button", { name: "분석" }).click();
   await expect(page.getByText("SQL 역량 키워드를 찾지 못했습니다")).toBeVisible();
   await expect(page.getByRole("heading", { name: "추천 문제" })).toHaveCount(0);
+  await page.getByRole("button", { name: "수정" }).click();
   await box.fill("퍼널 전환율 분석");
   await page.getByRole("button", { name: "분석" }).click();
   const target = page.locator('a[href^="/problems/"]').filter({ hasText: "퍼널 분석" }).first();

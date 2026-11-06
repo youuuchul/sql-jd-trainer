@@ -1,6 +1,7 @@
 "use client";
-import Link from "next/link";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { Selecky } from "@/components/selecky/Selecky";
+import { Button } from "@/components/ui/Button";
 import { MockExam } from "@/components/workspace/MockExam";
 import type { Problem, SchemaDef } from "@/lib/content/types";
 import { JD_MOCK_MAX_MIN, JD_MOCK_SET_ID, JD_MOCK_SET_KEY, parseJdMockSet } from "@/lib/jd/mock-set";
@@ -52,12 +53,13 @@ export function JdMockExam() {
 
 function Notice({ message }: { message: string }) {
   return (
-    <div className="mx-auto w-full max-w-2xl px-5 py-12">
-      <h1 className="text-2xl font-semibold tracking-tight">{TITLE}</h1>
-      <p className="mt-2 text-[15px] text-fg/85">{message}</p>
-      <Link href="/jd" className="mt-6 inline-flex h-9 items-center rounded-lg bg-accent px-3 text-sm font-semibold text-white hover:bg-accent/85">
-        공고 분석으로
-      </Link>
+    <div className="mx-auto flex w-full max-w-md flex-1 flex-col items-center justify-center gap-5 px-5 py-12 text-center">
+      <Selecky motion="C5" />
+      <div>
+        <h1 className="text-[22px] font-extrabold tracking-[-0.02em]">{TITLE}</h1>
+        <p className="mt-2 text-[15px] text-fg-2">{message}</p>
+      </div>
+      <Button href="/jd">공고 분석으로</Button>
     </div>
   );
 }
