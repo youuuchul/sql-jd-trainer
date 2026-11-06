@@ -15,18 +15,18 @@ export interface BadgeProps {
 
 const SOFT: Record<BadgeTone, string> = {
   neutral: "bg-fg/10 text-fg/80",
-  accent: "bg-accent/15 text-accent",
-  success: "bg-emerald-400/15 text-emerald-300",
-  warning: "bg-amber-400/15 text-amber-300",
-  danger: "bg-red-400/15 text-red-300",
+  accent: "bg-accent-soft text-accent-ink",
+  success: "bg-pass-soft text-pass-ink",
+  warning: "bg-warn-soft text-warn",
+  danger: "bg-fail-soft text-fail-ink",
 };
 
 const SOLID: Record<BadgeTone, string> = {
   neutral: "bg-fg text-bg",
   accent: "bg-accent text-white",
-  success: "bg-emerald-500 text-white",
-  warning: "bg-amber-400 text-black",
-  danger: "bg-red-500 text-white",
+  success: "bg-pass text-white",
+  warning: "bg-warn text-white dark:text-black",
+  danger: "bg-fail text-white",
 };
 
 export function Badge({ children, tone = "neutral", appearance = "soft", size = "md", dot = false, className = "" }: BadgeProps) {

@@ -63,12 +63,12 @@ export function SegmentedControl<T extends string>({
       aria-label={label}
       aria-disabled={disabled || undefined}
       onKeyDown={onKeyDown}
-      className={`relative grid rounded-xl bg-fg/10 p-1 ${disabled ? "opacity-50" : ""} ${className}`}
+      className={`relative grid rounded-[13px] bg-surface-2 p-1 shadow-[inset_0_0_0_1px_var(--color-line)] ${disabled ? "opacity-50" : ""} ${className}`}
       style={{ gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))` }}
     >
       <span
         aria-hidden="true"
-        className="absolute top-1 bottom-1 left-1 rounded-lg bg-surface shadow-sm ring-1 ring-white/5 transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none"
+        className="absolute top-1 bottom-1 left-1 rounded-[9px] bg-surface shadow-[0_1px_2px_rgb(0_0_0/0.08),inset_0_0_0_1px_var(--color-line-2)] dark:bg-surface-3 dark:shadow-none transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none"
         style={{ width: `calc((100% - 0.5rem) / ${options.length})`, transform: `translateX(${index * 100}%)` }}
       />
       {options.map((o, i) => {
@@ -86,9 +86,9 @@ export function SegmentedControl<T extends string>({
             tabIndex={selected ? 0 : -1}
             disabled={disabled}
             onClick={() => select(i)}
-            className={`relative z-10 rounded-lg font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent disabled:cursor-not-allowed ${
+            className={`relative z-10 rounded-lg transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent disabled:cursor-not-allowed ${
               size === "sm" ? "h-7 px-2.5 text-[13px] after:absolute after:inset-x-0 after:-inset-y-[6px] after:content-['']" : "h-10 px-3 text-sm"
-            } ${selected ? "text-fg" : "text-muted hover:text-fg/80"}`}
+            } font-semibold ${selected ? "text-fg" : "text-muted hover:text-fg-2"}`}
           >
             <span className="block truncate">{o.label}</span>
           </button>

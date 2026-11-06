@@ -1,11 +1,142 @@
-@theme {
-  --color-bg: #111111;
-  --color-surface: #1b1b1b;
-  --color-line: #2a2a2a;
-  --color-fg: #f2f2f2;
-  --color-muted: #8c8c8c;
-  --color-accent: #6b8cff;
+/* 하루쿼리 디자인 토큰. 밝음(팔레트 A)이 기본, 어두움은 prefers-color-scheme 로 덮는다.
+   시안: docs/design/haruquery-v2/mockup/index.html 1. 테마 토큰 */
+@theme static {
+  --color-bg: #f4f7fc;
+  --color-surface: #ffffff;
+  --color-surface-2: #edf2f9;
+  --color-surface-3: #e1e8f2;
+  --color-line: #dfe6f0;
+  --color-line-2: #cad4e2;
+  --color-fg: #0e1628;
+  --color-fg-2: #3a475e;
+  --color-muted: #69768e;
+  --color-faint: #9da8ba;
+
+  --color-accent: #2160ff;
+  --color-accent-deep: #1443c9;
+  --color-accent-soft: #e5edff;
+  --color-accent-ink: #1544cf;
+  --color-on-accent: #ffffff;
+
+  --color-pass: #1e9e56;
+  --color-pass-deep: #157a40;
+  --color-pass-soft: #ddf5e5;
+  --color-pass-ink: #0e6a35;
+  --color-pass-sheet: #dcf6e7;
+  --color-fail: #e5484d;
+  --color-fail-deep: #b7343a;
+  --color-fail-soft: #fde7e7;
+  --color-fail-ink: #a8262c;
+  --color-fail-sheet: #ffe5e6;
+  --color-warn: #b46a00;
+  --color-warn-soft: #fff0d6;
+
+  --color-note: #ffe27a;
+  --color-note-bg: #fff6cf;
+  --color-note-ink: #574300;
+  --color-note-line: #f5dc7a;
+  --color-flame: #ff8a1f;
+  --color-flame-deep: #d96a00;
+  --color-flame-soft: #ffeddc;
+
+  --color-cat-basics: #2160ff;
+  --color-cat-job: #0aa39c;
+  --color-cat-kpi: #f29d00;
+  --color-cat-review: #7a4cf5;
+  --color-cat-archive: #66728a;
+
+  --color-dialect-pg: #1c6fc4;
+  --color-dialect-bq: #14854a;
+  --color-dialect-my: #b4570b;
+
+  --color-diff-missing: #f2c200;
+  --color-diff-extra: #e5484d;
+
+  --color-code-bg: #f8fafe;
+  --color-code-fg: #2a2e37;
+  --color-syntax-keyword: #2e47cf;
+  --color-syntax-function: #9437bf;
+  --color-syntax-string: #0d7a4e;
+  --color-syntax-number: #c2480b;
+  --color-syntax-comment: #9aa0a9;
+
+  --color-slot: #e9f0ff;
+  --color-slot-line: #adc3ff;
+  --color-tab-bg: rgb(255 255 255 / 0.95);
+  --color-side-bg: #fafcff;
+  /* 눌림 버튼·카드 아래 그림자 바닥색. 어두움은 거의 검정 */
+  --color-lip: #cad4e2;
+
   --radius-card: 1.25rem;
-  --font-sans: "Pretendard", "Inter", system-ui, sans-serif;
+  --font-sans: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg: #0f1115;
+    --color-surface: #171a20;
+    --color-surface-2: #1e2229;
+    --color-surface-3: #272c35;
+    --color-line: #262b34;
+    --color-line-2: #343a46;
+    --color-fg: #eceef2;
+    --color-fg-2: #b5bbc7;
+    --color-muted: #7f8796;
+    --color-faint: #5a6170;
+
+    --color-accent: #6382ff;
+    --color-accent-deep: #4560d8;
+    --color-accent-soft: rgb(99 130 255 / 0.15);
+    --color-accent-ink: #9eb2ff;
+    --color-on-accent: #ffffff;
+
+    --color-pass: #3ccb7f;
+    --color-pass-deep: #24945a;
+    --color-pass-soft: rgb(60 203 127 / 0.13);
+    --color-pass-ink: #6be3a2;
+    --color-pass-sheet: #11261a;
+    --color-fail: #ff6369;
+    --color-fail-deep: #c9414a;
+    --color-fail-soft: rgb(255 99 105 / 0.12);
+    --color-fail-ink: #ff9095;
+    --color-fail-sheet: #2a1416;
+    --color-warn: #f5b83d;
+    --color-warn-soft: rgb(245 184 61 / 0.13);
+
+    --color-note: #e8c452;
+    --color-note-bg: #2c2610;
+    --color-note-ink: #f4dc8a;
+    --color-note-line: #4a3f15;
+    --color-flame: #ff9533;
+    --color-flame-deep: #c4650c;
+    --color-flame-soft: rgb(255 149 51 / 0.14);
+
+    --color-cat-basics: #7891ff;
+    --color-cat-job: #2cc6be;
+    --color-cat-kpi: #f5b23a;
+    --color-cat-review: #a68bff;
+    --color-cat-archive: #8b93a1;
+
+    --color-dialect-pg: #7cc4ff;
+    --color-dialect-bq: #8fd3a1;
+    --color-dialect-my: #f6b26b;
+
+    --color-diff-missing: #e8c452;
+    --color-diff-extra: #ff6369;
+
+    --color-code-bg: #13161b;
+    --color-code-fg: #d7dbe3;
+    --color-syntax-keyword: #c792ea;
+    --color-syntax-function: #82aaff;
+    --color-syntax-string: #c3e88d;
+    --color-syntax-number: #f78c6c;
+    --color-syntax-comment: #6f7787;
+
+    --color-slot: #1f2533;
+    --color-slot-line: #3b4766;
+    --color-tab-bg: rgb(17 19 24 / 0.94);
+    --color-side-bg: #12151a;
+    --color-lip: #07080a;
+  }
 }
