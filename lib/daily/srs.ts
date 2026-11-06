@@ -126,3 +126,43 @@ export const streak = (completedDays: Set<string>, now: number): number => {
   }
   return n;
 };
+
+/** 복습 상자 번호의 간격 이름(사다리 눈금·칩용). 0 → 5분, 1 → 1일 … */
+export const intervalLabel = (box: number): string => {
+  const min = BOX_INTERVAL_MIN[Math.min(Math.max(box, 0), MAX_BOX)];
+  return min < 60 ? `${min}분` : `${min / (60 * 24)}일`;
+};
+
+/** 화면에 내지 않는 방언(MySQL)의 카드는 출제·집계에서 뺀다. 콘텐츠와 저장값은 그대로 둔다 */
+export const isShown = (card: Pick<Card, "dialect">): boolean => card.dialect !== "mysql";
+
+const editDistance = (a: string, b: string): number => {
+  let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i];
+    for (let j = 1; j <= b.length; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    prev = cur;
+  }
+  return prev[b.length];
+};
+
+/** 입력이 정답 후보와 몇 글자 다른지(후보 중 최솟값). 비교 규칙은 isCorrect 와 같다 */
+export const answerDistance = (card: Pick<Card, "template" | "answers" | "caseSensitive">, input: string): number => {
+  const i = card.template.indexOf(BLANK);
+  const before = card.template[i - 1];
+  const after = card.template[i + BLANK.length];
+  const quoted = before !== undefined && before === after && `'"\``.includes(before);
+  const candidates = quoted ? [input, stripQuotes(input)] : [input];
+  return Math.min(...card.answers.flatMap((a) => candidates.map((c) => editDistance(norm(c, card.caseSensitive), norm(a, card.caseSensitive)))));
+};
+
+/** now 가 속한 주(월~일)의 요일 라벨·날짜 키 */
+export const weekOf = (now: number): { key: string; label: string; today: boolean }[] => {
+  const labels = ["월", "화", "수", "목", "금", "토", "일"];
+  const d = new Date(now);
+  const mondayOffset = (d.getDay() + 6) % 7;
+  return labels.map((label, i) => {
+    const t = new Date(d.getFullYear(), d.getMonth(), d.getDate() - mondayOffset + i, 12).getTime();
+    return { key: dayKey(t), label, today: i === mondayOffset };
+  });
+};
