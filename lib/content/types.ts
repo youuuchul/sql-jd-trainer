@@ -8,6 +8,9 @@ export const DIALECT_LABEL: Record<Dialect, string> = {
   mysql: "MySQL",
 };
 
+/** 화면에서 고를 수 있는 방언. MySQL 은 실행 코드만 두고 화면에서는 숨긴다 */
+export const UI_DIALECTS = ["postgres", "bigquery"] as const satisfies readonly Dialect[];
+
 export const DialectSchema = z.enum(DIALECTS);
 
 export const CellSchema = z.union([z.string(), z.number(), z.boolean(), z.null()]);

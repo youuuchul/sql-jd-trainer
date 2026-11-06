@@ -70,7 +70,8 @@ export const useProblemProgress = (problemId: string) => {
 const dialectListeners = new Set<() => void>();
 const readDialect = (): Dialect => {
   const v = window.localStorage.getItem(DIALECT_KEY);
-  return v === "bigquery" || v === "mysql" ? v : "postgres";
+  // mysql 저장값은 화면에서 숨긴 방언이라 기본 방언으로 연다
+  return v === "bigquery" ? v : "postgres";
 };
 const subscribeDialect = (l: () => void) => {
   dialectListeners.add(l);

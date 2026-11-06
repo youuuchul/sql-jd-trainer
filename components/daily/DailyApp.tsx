@@ -2,14 +2,14 @@
 import { Flame } from "lucide-react";
 import { useMemo, useState } from "react";
 import { SegmentedControl } from "@/components/ui-lab/components/segmented-control/SegmentedControl";
-import { DIALECT_LABEL, DIALECTS, type CardDeck, type SyntaxRef } from "@/lib/content/types";
+import { DIALECT_LABEL, UI_DIALECTS, type CardDeck, type SyntaxRef } from "@/lib/content/types";
 import { buildQueue, dayKey, MASTERED_BOX, matchesDialect, streak, type DialectFilter } from "@/lib/daily/srs";
 import { useDailyStore, useNow } from "@/lib/daily/store";
 import { CardSession, type SessionCard, type SessionResult } from "./CardSession";
 import { PushToggle } from "./PushToggle";
 
 const GOALS = [5, 10, 20, 30] as const;
-const DIALECT_OPTIONS: { value: DialectFilter; label: string }[] = [{ value: "all", label: "전체" }, ...DIALECTS.map((d) => ({ value: d, label: d === "postgres" ? "Postgres" : DIALECT_LABEL[d] }))];
+const DIALECT_OPTIONS: { value: DialectFilter; label: string }[] = [{ value: "all", label: "전체" }, ...UI_DIALECTS.map((d) => ({ value: d, label: d === "postgres" ? "Postgres" : DIALECT_LABEL[d] }))];
 
 type View = { kind: "home" } | { kind: "session"; queue: SessionCard[] } | { kind: "summary"; results: SessionResult[] };
 
@@ -17,7 +17,8 @@ export function DailyApp({ decks, syntax }: { decks: CardDeck[]; syntax: SyntaxR
   const { store, record, updateSettings } = useDailyStore();
   const [view, setView] = useState<View>({ kind: "home" });
   const [now, refreshNow] = useNow();
-  const { goal, dialect } = store.settings;
+  const { goal } = store.settings;
+  const dialect: DialectFilter = store.settings.dialect === "mysql" ? "all" : store.settings.dialect;
 
   const cards = useMemo(() => decks.flatMap((d) => d.cards.map((c) => ({ ...c, deckTitle: d.title }))), [decks]);
   const syntaxById = useMemo(() => Object.fromEntries(syntax.map((s) => [s.id, s])), [syntax]);
