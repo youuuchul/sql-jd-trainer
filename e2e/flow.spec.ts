@@ -178,32 +178,35 @@ test("공고 분석: 역량 태그와 추천 문제, 잠긴 문제 제외, 새�
   await expect(page).toHaveURL(new RegExp(`${href}$`));
 });
 
-test("공고 추천 모의 시험: 추천 문제로 바로 시작, 다른 스키마 문제 채점, 종료 요약, 새로고침 후 유지", async ({ page }) => {
+test("공고 추천 모의 시험: 추천 앞 6문제·최대 60분으로 바로 시작, 다른 스키마 문제 채점, 종료 요약, 새로고침 후 유지", async ({ page }) => {
   await page.goto("/jd");
   await page.getByRole("textbox", { name: "채용 공고" }).fill("앱 이벤트 로그로 퍼널 전환율을 분석하고 A/B 테스트로 검증합니다. 데이터 정합성을 검증합니다. 결제·정산 데이터를 다룹니다.");
   await page.getByRole("button", { name: "분석" }).click();
   const links = page.locator('a[href^="/problems/"]');
   await expect(links.first()).toBeVisible();
   const recs = (await links.evaluateAll((els) => els.map((e) => e.getAttribute("href")!.replace("/problems/", "")))).map(problem);
-  const n = recs.length;
-  const target = recs.findIndex((p) => (p.format === "write" || p.format === "fix") && p.schema !== recs[0].schema && p.solutions?.postgres);
+  expect(recs.length, "추천이 6문제를 넘어야 앞 6문제만 담는지 확인할 수 있음").toBeGreaterThan(6);
+  const exam = recs.slice(0, 6);
+  const n = exam.length;
+  const minutes = Math.min(60, exam.reduce((a, p) => a + (p.timeLimitMin ?? 10), 0));
+  const target = exam.findIndex((p) => (p.format === "write" || p.format === "fix") && p.schema !== exam[0].schema && p.solutions?.postgres);
   expect(target, "첫 문제와 스키마가 다른 쿼리 문제가 추천에 없음").toBeGreaterThan(0);
 
   await page.getByRole("button", { name: "모의 시험 시작" }).click();
   await expect(page).toHaveURL(/\/mock\/jd$/);
   await expect(page.getByRole("heading", { name: "공고 추천 모의 시험" })).toBeVisible();
-  await expect(page.getByText(new RegExp(`^문제 ${n}개,`))).toBeVisible();
+  await expect(page.getByText(new RegExp(`^문제 ${n}개, 제한 시간 ${minutes}분`))).toBeVisible();
   const items = page.locator("main ol > li").filter({ visible: true });
   await expect(items).toHaveCount(n);
-  for (const [i, p] of recs.entries()) await expect(items.nth(i)).toContainText(p.title);
+  for (const [i, p] of exam.entries()) await expect(items.nth(i)).toContainText(p.title);
 
   await page.getByRole("button", { name: "시작", exact: true }).click();
-  await expect(page.getByText(/남은 시간 \d+:/)).toBeVisible();
+  await expect(page.getByText(new RegExp(`남은 시간 ${String(minutes - 1).padStart(2, "0")}:`))).toBeVisible();
   await page.getByRole("button", { name: String(target + 1), exact: true }).click();
   await expect(page.getByText(`${target + 1} / ${n}`)).toBeVisible();
   await waitReady(page);
   await expect(page.getByText("해설 먼저 보기")).toHaveCount(0);
-  await setEditor(page, recs[target].solutions!.postgres!);
+  await setEditor(page, exam[target].solutions!.postgres!);
   await page.getByRole("button", { name: /실행/ }).click();
   await expect(page.getByText("정답", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "시험 종료" }).click();
@@ -212,10 +215,10 @@ test("공고 추천 모의 시험: 추천 문제로 바로 시작, 다른 스키
   await expect(page.getByRole("link", { name: "문제 목록으로" })).toHaveAttribute("href", "/jd");
 
   await page.reload();
-  await expect(page.getByText(new RegExp(`^문제 ${n}개,`))).toBeVisible();
+  await expect(page.getByText(new RegExp(`^문제 ${n}개, 제한 시간 ${minutes}분`))).toBeVisible();
 });
 
-test("공고 추천 모의 시험: 잠긴 문제는 저장값에 넣어도·잠금을 풀어도 빠지고, 저장값이 없으면 공고 분석으로 안내", async ({ page }) => {
+test("공고 추천 모의 시험: 잠긴 문제는 저장값에 넣어도·잠금을 풀어도 빠지고, 저장값이 많아도 6문제·60분까지, 저장값이 없으면 공고 분석으로 안내", async ({ page }) => {
   const locked = lockedSchemaIds();
   const lockedProblem = problems().find((p) => locked.has(p.schema))!;
   const openProblem = problems().find((p) => !locked.has(p.schema))!;
@@ -235,4 +238,16 @@ test("공고 추천 모의 시험: 잠긴 문제는 저장값에 넣어도·잠�
   await expect(page.locator("main ol > li").filter({ visible: true })).toHaveCount(1);
   await expect(page.getByText(openProblem.title)).toBeVisible();
   await expect(page.getByText(lockedProblem.title)).toHaveCount(0);
+
+  const long = problems()
+    .filter((p) => !locked.has(p.schema))
+    .sort((a, b) => (b.timeLimitMin ?? 10) - (a.timeLimitMin ?? 10))
+    .slice(0, 8);
+  expect(long.slice(0, 6).reduce((a, p) => a + (p.timeLimitMin ?? 10), 0), "앞 6문제 권장 시간 합이 60분을 넘어야 상한을 확인할 수 있음").toBeGreaterThan(60);
+  await page.evaluate(([key, value]) => window.localStorage.setItem(key, value), [JD_MOCK_SET_KEY, JSON.stringify({ problems: long.map((p) => p.id), competencies: [] })]);
+  await page.reload();
+  await expect(page.getByText(/^문제 6개, 제한 시간 60분/)).toBeVisible();
+  const items = page.locator("main ol > li").filter({ visible: true });
+  await expect(items).toHaveCount(6);
+  for (const [i, p] of long.slice(0, 6).entries()) await expect(items.nth(i)).toContainText(p.title);
 });

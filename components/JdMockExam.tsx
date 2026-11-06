@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { MockExam } from "@/components/workspace/MockExam";
 import type { Problem, SchemaDef } from "@/lib/content/types";
-import { JD_MOCK_SET_ID, JD_MOCK_SET_KEY, parseJdMockSet } from "@/lib/jd/mock-set";
+import { JD_MOCK_MAX_MIN, JD_MOCK_SET_ID, JD_MOCK_SET_KEY, parseJdMockSet } from "@/lib/jd/mock-set";
 
 const TITLE = "공고 추천 모의 시험";
 const subscribe = () => () => {};
@@ -39,7 +39,15 @@ export function JdMockExam() {
   if (saved === undefined || (key && loaded?.key !== key)) return <div className="flex-1" />;
   if (loaded && "error" in loaded) return <Notice message="문제를 불러오지 못했습니다." />;
   if (!key || !loaded?.problems.length) return <Notice message="저장된 추천 문제가 없습니다." />;
-  return <MockExam set={{ id: JD_MOCK_SET_ID, title: TITLE, description: saved!.competencies.join(" · ") }} problems={loaded.problems} schemas={loaded.schemas} backHref="/jd" />;
+  const timeLimitMin = Math.min(JD_MOCK_MAX_MIN, loaded.problems.reduce((a, p) => a + (p.timeLimitMin ?? 10), 0));
+  return (
+    <MockExam
+      set={{ id: JD_MOCK_SET_ID, title: TITLE, description: saved!.competencies.join(" · "), timeLimitMin }}
+      problems={loaded.problems}
+      schemas={loaded.schemas}
+      backHref="/jd"
+    />
+  );
 }
 
 function Notice({ message }: { message: string }) {

@@ -5,7 +5,7 @@ import { ProblemList } from "@/components/ProblemList";
 import { Badge } from "@/components/ui-lab/components/badge/Badge";
 import { Button } from "@/components/ui-lab/components/button/Button";
 import { analyzeJd, recommendProblems, type Competency, type CompetencyMatch, type ProblemSummary } from "@/lib/jd/match";
-import { JD_MOCK_SET_ID, saveJdMockSet } from "@/lib/jd/mock-set";
+import { JD_MOCK_MAX_PROBLEMS, JD_MOCK_SET_ID, saveJdMockSet } from "@/lib/jd/mock-set";
 
 const KEY = "sjt:jd:v1";
 const listeners = new Set<() => void>();
@@ -41,7 +41,7 @@ export function JdAnalyzer({ competencies, problems }: { competencies: Competenc
   const reasons = Object.fromEntries(recs.map((r) => [r.problem.id, r.reasons]));
 
   const startMock = () => {
-    saveJdMockSet({ problems: recs.map((r) => r.problem.id), competencies: (matches ?? []).map((m) => m.competency.label) });
+    saveJdMockSet({ problems: recs.slice(0, JD_MOCK_MAX_PROBLEMS).map((r) => r.problem.id), competencies: (matches ?? []).map((m) => m.competency.label) });
     router.push(`/mock/${JD_MOCK_SET_ID}`);
   };
 
