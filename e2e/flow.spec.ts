@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { JD_MOCK_SET_KEY } from "../lib/jd/mock-set";
 import { lockedSchemaIds, problem, problems, set } from "./content";
 import { unlock } from "./helpers";
 
@@ -175,4 +176,63 @@ test("공고 분석: 역량 태그와 추천 문제, 잠긴 문제 제외, 새�
   const href = await target.getAttribute("href");
   await target.click();
   await expect(page).toHaveURL(new RegExp(`${href}$`));
+});
+
+test("공고 추천 모의 시험: 추천 문제로 바로 시작, 다른 스키마 문제 채점, 종료 요약, 새로고침 후 유지", async ({ page }) => {
+  await page.goto("/jd");
+  await page.getByRole("textbox", { name: "채용 공고" }).fill("앱 이벤트 로그로 퍼널 전환율을 분석하고 A/B 테스트로 검증합니다. 데이터 정합성을 검증합니다. 결제·정산 데이터를 다룹니다.");
+  await page.getByRole("button", { name: "분석" }).click();
+  const links = page.locator('a[href^="/problems/"]');
+  await expect(links.first()).toBeVisible();
+  const recs = (await links.evaluateAll((els) => els.map((e) => e.getAttribute("href")!.replace("/problems/", "")))).map(problem);
+  const n = recs.length;
+  const target = recs.findIndex((p) => (p.format === "write" || p.format === "fix") && p.schema !== recs[0].schema && p.solutions?.postgres);
+  expect(target, "첫 문제와 스키마가 다른 쿼리 문제가 추천에 없음").toBeGreaterThan(0);
+
+  await page.getByRole("button", { name: "모의 시험 시작" }).click();
+  await expect(page).toHaveURL(/\/mock\/jd$/);
+  await expect(page.getByRole("heading", { name: "공고 추천 모의 시험" })).toBeVisible();
+  await expect(page.getByText(new RegExp(`^문제 ${n}개,`))).toBeVisible();
+  const items = page.locator("main ol > li").filter({ visible: true });
+  await expect(items).toHaveCount(n);
+  for (const [i, p] of recs.entries()) await expect(items.nth(i)).toContainText(p.title);
+
+  await page.getByRole("button", { name: "시작", exact: true }).click();
+  await expect(page.getByText(/남은 시간 \d+:/)).toBeVisible();
+  await page.getByRole("button", { name: String(target + 1), exact: true }).click();
+  await expect(page.getByText(`${target + 1} / ${n}`)).toBeVisible();
+  await waitReady(page);
+  await expect(page.getByText("해설 먼저 보기")).toHaveCount(0);
+  await setEditor(page, recs[target].solutions!.postgres!);
+  await page.getByRole("button", { name: /실행/ }).click();
+  await expect(page.getByText("정답", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "시험 종료" }).click();
+  await expect(page.getByRole("heading", { name: "결과" })).toBeVisible();
+  await expect(page.getByText(new RegExp(`${n}문제 중 1문제 정답`))).toBeVisible();
+  await expect(page.getByRole("link", { name: "문제 목록으로" })).toHaveAttribute("href", "/jd");
+
+  await page.reload();
+  await expect(page.getByText(new RegExp(`^문제 ${n}개,`))).toBeVisible();
+});
+
+test("공고 추천 모의 시험: 잠긴 문제는 저장값에 넣어도·잠금을 풀어도 빠지고, 저장값이 없으면 공고 분석으로 안내", async ({ page }) => {
+  const locked = lockedSchemaIds();
+  const lockedProblem = problems().find((p) => locked.has(p.schema))!;
+  const openProblem = problems().find((p) => !locked.has(p.schema))!;
+  await unlock(page);
+  const res = await page.request.get(`/api/mock-set?ids=${lockedProblem.id},${openProblem.id}`);
+  const body = (await res.json()) as { problems: { id: string }[]; schemas: { id: string }[] };
+  expect(body.problems.map((p) => p.id)).toEqual([openProblem.id]);
+  expect(body.schemas.map((s) => s.id)).toEqual([openProblem.schema]);
+
+  await page.goto("/mock/jd");
+  await expect(page.getByText("저장된 추천 문제가 없습니다.")).toBeVisible();
+  await expect(page.getByRole("link", { name: "공고 분석으로" })).toHaveAttribute("href", "/jd");
+
+  await page.evaluate(([key, value]) => window.localStorage.setItem(key, value), [JD_MOCK_SET_KEY, JSON.stringify({ problems: [lockedProblem.id, openProblem.id], competencies: [] })]);
+  await page.reload();
+  await expect(page.getByText(/^문제 1개,/)).toBeVisible();
+  await expect(page.locator("main ol > li").filter({ visible: true })).toHaveCount(1);
+  await expect(page.getByText(openProblem.title)).toBeVisible();
+  await expect(page.getByText(lockedProblem.title)).toHaveCount(0);
 });
