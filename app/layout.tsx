@@ -9,10 +9,11 @@ const mono = JetBrains_Mono({ variable: "--font-jetbrains", subsets: ["latin"], 
 export const metadata: Metadata = {
   title: "하루쿼리",
   description: "하루 SQL 카드와 데이터 분석가 라이브 쿼리 연습",
-  appleWebApp: { capable: true, title: "하루쿼리", statusBarStyle: "default" },
+  appleWebApp: { capable: true, title: "하루쿼리", statusBarStyle: "black-translucent" },
 };
 
 export const viewport: Viewport = {
+  viewportFit: "cover",
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#f4f7fc" },
     { media: "(prefers-color-scheme: dark)", color: "#0f1115" },

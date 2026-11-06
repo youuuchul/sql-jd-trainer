@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
+import { SeleckyMark } from "@/components/selecky/SeleckyMark";
 import { Icon, type IconName } from "@/components/ui/icons";
 import { SettingsBox } from "./SettingsBox";
 import { useTabBarHidden } from "./tabbar";
@@ -23,17 +24,11 @@ const activeOf = (path: string): NavKey | null => {
 /** 문제 풀이·모의 시험: 데스크톱은 아이콘 레일, 모바일은 아래 탭 없음 */
 const isFocus = (path: string) => path.startsWith("/problems/") || path.startsWith("/mock/");
 
-function Logo() {
-  // 앱 아이콘 축소판. 파일은 selecky 패널이 같은 경로로 바꾼다
-  // eslint-disable-next-line @next/next/no-img-element
-  return <img src="/icons/icon-192.png" alt="" width={28} height={28} className="h-7 w-7 shrink-0 rounded-[22%]" />;
-}
-
 function Sidebar({ rail, active }: { rail: boolean; active: NavKey | null }) {
   return (
-    <aside className={`sticky top-0 z-20 hidden h-dvh flex-col gap-1 bg-side-bg shadow-[1px_0_0_var(--color-line)] lg:flex ${rail ? "items-center px-3 py-5" : "px-3.5 pt-[22px] pb-5"}`}>
+    <aside className={`sticky top-[env(safe-area-inset-top)] z-20 hidden h-[calc(100dvh-env(safe-area-inset-top))] flex-col gap-1 bg-side-bg shadow-[1px_0_0_var(--color-line)] lg:flex ${rail ? "items-center px-3 py-5" : "px-3.5 pt-[22px] pb-5"}`}>
       <Link href="/" aria-label="하루쿼리" className={`flex items-center gap-2.5 ${rail ? "pt-0.5 pb-[18px]" : "px-2.5 pt-0.5 pb-[22px]"}`}>
-        <Logo />
+        <SeleckyMark size={28} />
         {!rail && (
           <span className="grid text-base leading-[1.15] font-extrabold tracking-[-0.02em]">
             하루쿼리
@@ -94,6 +89,7 @@ function TabBar({ active }: { active: NavKey | null }) {
 /**
  * 앱 셸. 데스크톱(1024px 이상)은 왼쪽 사이드바(풀이 화면은 아이콘 레일), 모바일은 아래 탭 3개.
  * 아래 탭이 보이면 main 아래에 탭 높이만큼 여백을 둔다.
+ * viewport-fit=cover 라 위·좌우 safe-area 여백은 여기서 한 번 두고, 상태 표시줄 뒤는 바탕색 띠로 가린다.
  */
 export function AppShell({ children }: { children: ReactNode }) {
   const path = usePathname();
@@ -101,10 +97,11 @@ export function AppShell({ children }: { children: ReactNode }) {
   const hidden = useTabBarHidden();
   const tabs = !focus && !hidden;
   return (
-    <div className={`min-h-dvh lg:grid ${focus ? "lg:grid-cols-[72px_minmax(0,1fr)]" : "lg:grid-cols-[236px_minmax(0,1fr)]"}`}>
+    <div className={`min-h-dvh pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pl-[env(safe-area-inset-left)] lg:grid ${focus ? "lg:grid-cols-[72px_minmax(0,1fr)]" : "lg:grid-cols-[236px_minmax(0,1fr)]"}`}>
       <Sidebar rail={focus} active={activeOf(path)} />
-      <main className={`flex min-h-dvh min-w-0 flex-col ${tabs ? "pb-[calc(68px+max(env(safe-area-inset-bottom),12px))] lg:pb-0" : ""}`}>{children}</main>
+      <main className={`flex min-h-[calc(100dvh-env(safe-area-inset-top))] min-w-0 flex-col ${tabs ? "pb-[calc(68px+max(env(safe-area-inset-bottom),12px))] lg:pb-0" : ""}`}>{children}</main>
       {tabs && <TabBar active={activeOf(path)} />}
+      <div aria-hidden="true" className="fixed inset-x-0 top-0 z-[60] h-[env(safe-area-inset-top)] bg-bg" />
     </div>
   );
 }

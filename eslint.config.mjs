@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // 셀렉이 런타임 원본의 바이트 동일 사본
+    "components/selecky/selecky-runtime.js",
+    "components/selecky/runtime-source.generated.ts",
   ]),
 ]);
 
