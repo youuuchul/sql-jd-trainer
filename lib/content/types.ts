@@ -62,7 +62,7 @@ export const WrongPatternSchema = z.object({
 });
 export type WrongPattern = z.infer<typeof WrongPatternSchema>;
 
-export const ProblemFormatSchema = z.enum(["write", "fix", "mcq", "predict", "spot"]);
+export const ProblemFormatSchema = z.enum(["write", "fix", "mcq", "predict", "spot", "review"]);
 export type ProblemFormat = z.infer<typeof ProblemFormatSchema>;
 export const FORMAT_LABEL: Record<ProblemFormat, string> = {
   write: "쿼리 작성",
@@ -70,6 +70,7 @@ export const FORMAT_LABEL: Record<ProblemFormat, string> = {
   mcq: "객관식",
   predict: "출력 예측",
   spot: "결과 이상 찾기",
+  review: "쿼리 리뷰",
 };
 
 /** 출력 예측용 입력 데이터 표. columns/rows는 빌드가 sql.postgres 실행 결과로 채운다. */
@@ -90,6 +91,57 @@ export const SpotSchema = z.object({
   anomalyRows: z.array(z.number()).default([]),
 });
 export type Spot = z.infer<typeof SpotSchema>;
+
+export const REVIEW_CATEGORIES = ["fanout", "duplicate", "null", "int-division", "boundary", "join", "definition"] as const;
+export const ReviewCategorySchema = z.enum(REVIEW_CATEGORIES);
+export type ReviewCategory = z.infer<typeof ReviewCategorySchema>;
+/** 쿼리 리뷰 채점 체크리스트. label 은 유형 이름, cue 는 대표 실수 */
+export const REVIEW_CATEGORY: Record<ReviewCategory, { label: string; cue: string }> = {
+  fanout: { label: "조인 팬아웃", cue: "1:N 조인 뒤 1쪽 값 합산" },
+  duplicate: { label: "중복 집계", cue: "COUNT(*)·DISTINCT 누락" },
+  null: { label: "NULL 처리", cue: "NULL·빈 값 그룹, 분모에서 빠짐" },
+  "int-division": { label: "정수 나눗셈", cue: "정수끼리 나눠 소수 버림" },
+  boundary: { label: "기간·경계", cue: "BETWEEN 끝 시각, 이상/초과" },
+  join: { label: "조인 조건", cue: "LEFT JOIN 무력화, 키 정규화 누락" },
+  definition: { label: "지표 정의", cue: "필터·분모·평균의 평균" },
+};
+
+/** 쿼리 리뷰의 줄 지정. match 중 하나가 들어 있는 줄(대소문자 무시). lines 는 빌드가 방언별로 채운다(1부터) */
+const ReviewLineRefSchema = z.object({
+  match: z.array(z.string()).min(1),
+  /** 이 방언에서만 해당한다. 없으면 세 방언 모두 */
+  dialects: z.array(DialectSchema).optional(),
+  lines: z.partialRecord(DialectSchema, z.array(z.number())).default({}),
+});
+
+export const ReviewDefectSchema = ReviewLineRefSchema.extend({
+  category: ReviewCategorySchema,
+  title: z.string(),
+  explanation: z.string(),
+});
+export type ReviewDefect = z.infer<typeof ReviewDefectSchema>;
+
+/** 의심스러워 보이지만 맞는 줄. 표시하면 오탐으로 센다 */
+export const ReviewDecoySchema = ReviewLineRefSchema.extend({ explanation: z.string() });
+export type ReviewDecoy = z.infer<typeof ReviewDecoySchema>;
+
+/** 쿼리 리뷰용 검토 대상 쿼리. results 는 빌드가 방언별 실행 결과와 정답에 없는 행 인덱스로 채운다 */
+export const ReviewSchema = z.object({
+  sql: z.partialRecord(DialectSchema, z.string()),
+  defects: z.array(ReviewDefectSchema).min(1),
+  decoys: z.array(ReviewDecoySchema).default([]),
+  results: z
+    .partialRecord(
+      DialectSchema,
+      z.object({
+        columns: z.array(z.string()),
+        rows: z.array(z.array(CellSchema)),
+        anomalyRows: z.array(z.number()),
+      }),
+    )
+    .default({}),
+});
+export type Review = z.infer<typeof ReviewSchema>;
 
 export const DifficultySchema = z.enum(["basic", "intermediate", "advanced"]);
 export type Difficulty = z.infer<typeof DifficultySchema>;
@@ -126,6 +178,7 @@ export const ProblemSchema = z.object({
   wrongPatterns: z.array(WrongPatternSchema).default([]),
   input: InputTableSchema.optional(),
   spot: SpotSchema.optional(),
+  review: ReviewSchema.optional(),
   explanation: z.string().default(""),
   dialectNotes: z.partialRecord(DialectSchema, z.string()).optional(),
   choices: z
@@ -138,12 +191,13 @@ export const ProblemSchema = z.object({
 });
 export type Problem = z.infer<typeof ProblemSchema>;
 
-export const SetCategorySchema = z.enum(["basics", "job", "kpi", "archive"]);
+export const SetCategorySchema = z.enum(["basics", "job", "kpi", "review", "archive"]);
 export type SetCategory = z.infer<typeof SetCategorySchema>;
 export const SET_CATEGORY_LABEL: Record<SetCategory, string> = {
   basics: "기초 문법",
   job: "직무별 실무",
   kpi: "KPI 대시보드",
+  review: "쿼리 리뷰",
   archive: "비공개 복습 아카이브",
 };
 

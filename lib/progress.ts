@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useSyncExternalStore } from "react";
-import type { Dialect } from "@/lib/content/types";
+import type { Dialect, ReviewCategory } from "@/lib/content/types";
 
 export interface ProblemProgress {
   passed: boolean;
@@ -12,6 +12,13 @@ export interface ProblemProgress {
   predictAnswer?: string;
   /** 결과 이상 찾기에서 고른 행 인덱스 */
   spotRows?: number[];
+  /** 쿼리 리뷰에서 표시한 줄(1부터)과 유형. 줄 번호가 방언마다 달라 방언별로 둔다 */
+  reviewMarks?: Partial<Record<Dialect, ReviewMark[]>>;
+}
+
+export interface ReviewMark {
+  line: number;
+  category: ReviewCategory;
 }
 
 type Store = Record<string, ProblemProgress>;

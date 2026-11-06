@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { REVIEW_CATEGORY, type Problem, type ReviewCategory } from "../lib/content/types";
 import { JD_MOCK_SET_KEY } from "../lib/jd/mock-set";
 import { lockedSchemaIds, problem, problems, set } from "./content";
 import { unlock } from "./helpers";
@@ -142,6 +143,86 @@ test("결과 이상 찾기: 행 선택 채점", async ({ page }) => {
   await expect(page.getByRole("tab", { name: /올바른 결과/ })).toBeVisible();
   await page.reload();
   await expect(page.getByRole("checkbox", { name: `${anomalies[0] + 1}번째 행 선택` })).toBeChecked();
+});
+
+const markLine = async (page: Page, line: number, category: ReviewCategory) => {
+  await page.getByRole("button", { name: `${line}번째 줄`, exact: true }).click();
+  await page.getByRole("radiogroup", { name: `${line}번째 줄 결함 유형` }).getByRole("radio", { name: REVIEW_CATEGORY[category].label }).click();
+};
+const firstLine = (ref: { lines: Partial<Record<string, number[]>> }, dialect = "postgres") => ref.lines[dialect]![0];
+const banner = (page: Page) => page.getByText(/결함 \d+개 중 \d+개 찾음/);
+
+test("쿼리 리뷰: 유형 다름·오탐 채점, 정답 공개, 새로고침 유지, 검증 쿼리", async ({ page }) => {
+  const reviewSet = set("review-marketing");
+  const p: Problem = problem(reviewSet.problems[1]);
+  const review = p.review!;
+  const [d0, ...rest] = review.defects;
+  const decoy = review.decoys[0];
+  const other: ReviewCategory = d0.category === "duplicate" ? "fanout" : "duplicate";
+
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "쿼리 리뷰", exact: true })).toBeVisible();
+  await page.goto(`/sets/${reviewSet.id}`);
+  await page.getByRole("link", { name: new RegExp(p.title) }).click();
+  await expect(page).toHaveURL(new RegExp(`/problems/${p.id}`));
+  await expect(page.getByText("리뷰 체크리스트")).toBeVisible();
+  await expect(page.getByRole("tab", { name: `검토 쿼리 결과 ${review.results.postgres!.rows.length}행` })).toBeVisible();
+
+  // 결함 줄에 다른 유형: 유형 다름
+  await markLine(page, firstLine(d0), other);
+  await page.getByRole("button", { name: "채점" }).click();
+  await expect(page.getByText("오답", { exact: true })).toBeVisible();
+  await expect(banner(page)).toHaveText(`결함 ${review.defects.length}개 중 0개 찾음 · 유형 다름 1줄`);
+  await expect(page.getByRole("button", { name: `${firstLine(d0)}번째 줄`, exact: true })).toContainText("유형 다름");
+
+  // 맞는 줄 표시: 결함 아님, 정답은 아직 숨김
+  await markLine(page, firstLine(decoy), "join");
+  await page.getByRole("button", { name: "채점" }).click();
+  await expect(banner(page)).toHaveText(`결함 ${review.defects.length}개 중 0개 찾음 · 유형 다름 1줄 · 결함 아님 1줄`);
+  await expect(page.getByRole("button", { name: `${firstLine(decoy)}번째 줄`, exact: true })).toContainText("결함 아님");
+  await expect(page.getByRole("button", { name: "정답 보기" })).toBeVisible();
+  await expect(page.getByText(d0.title)).toHaveCount(0);
+
+  // 고쳐서 통과하면 결함 설명·올바른 결과가 열린다
+  await markLine(page, firstLine(d0), d0.category);
+  await page.getByRole("button", { name: `${firstLine(decoy)}번째 줄`, exact: true }).click();
+  await page.getByRole("button", { name: "표시 지우기" }).click();
+  for (const d of rest) await markLine(page, firstLine(d), d.category);
+  await page.getByRole("button", { name: "채점" }).click();
+  await expect(page.getByText("정답", { exact: true })).toBeVisible();
+  await expect(banner(page)).toHaveText(`결함 ${review.defects.length}개 중 ${review.defects.length}개 찾음`);
+  for (const d of review.defects) await expect(page.getByText(d.title)).toBeVisible();
+  await expect(page.getByRole("tab", { name: `올바른 결과 ${p.expected!.rows.length}행` })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "맞는 줄" })).toBeVisible();
+
+  // 새로고침 후 표시 유지
+  await page.reload();
+  await expect(page.getByRole("button", { name: `${firstLine(d0)}번째 줄`, exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("button", { name: `${firstLine(decoy)}번째 줄`, exact: true })).toHaveAttribute("aria-pressed", "false");
+
+  // 검증 쿼리는 채점 없이 실행된다
+  await waitReady(page);
+  await page.getByRole("tab", { name: "검증 쿼리" }).click();
+  await setEditor(page, "SELECT COUNT(*) AS n FROM users WHERE signed_up_at >= '2025-05-31' AND signed_up_at < '2025-06-01'");
+  await page.getByRole("button", { name: /^실행/ }).click();
+  await expect(page.getByRole("table", { name: "검증 쿼리 결과" })).toContainText("2");
+});
+
+test("쿼리 리뷰: 방언에 따라 결함 수가 달라진다(정수 나눗셈)", async ({ page }) => {
+  const p = problem(set("review-marketing").problems[0]);
+  const review = p.review!;
+  const common = review.defects.filter((d) => !d.dialects);
+  const pgOnly = review.defects.filter((d) => d.dialects?.includes("postgres") && d.dialects.length === 1);
+  expect(pgOnly.length).toBeGreaterThan(0);
+  await page.goto(`/problems/${p.id}`);
+  for (const d of common) await markLine(page, firstLine(d), d.category);
+  await page.getByRole("button", { name: "채점" }).click();
+  await expect(banner(page)).toHaveText(`결함 ${review.defects.length}개 중 ${common.length}개 찾음`);
+  await page.getByRole("radio", { name: "BigQuery" }).click();
+  for (const d of common) await markLine(page, firstLine(d, "bigquery"), d.category);
+  await page.getByRole("button", { name: "채점" }).click();
+  await expect(page.getByText("정답", { exact: true })).toBeVisible();
+  await expect(banner(page)).toHaveText(`결함 ${common.length}개 중 ${common.length}개 찾음`);
 });
 
 test("공고 분석: 역량 태그와 추천 문제, 잠긴 문제 제외, 새로고침 후 유지", async ({ page }) => {

@@ -177,7 +177,74 @@ const main = async () => {
       }
     }
 
-    const out = { ...raw, expected, wrongPatterns, ...(input ? { input } : {}), ...(spot ? { spot } : {}) };
+    let review = raw.review;
+    if (problem.review) {
+      const results: Record<string, unknown> = { ...(raw.review.results ?? {}) };
+      type LineRef = { match: string[]; dialects?: string[]; lines: Record<string, number[]> };
+      const defects: (LineRef & { title: string })[] = raw.review.defects.map((d: LineRef) => ({ ...d, lines: {} }));
+      const decoys: (LineRef & { explanation: string })[] = (raw.review.decoys ?? []).map((d: LineRef) => ({ ...d, lines: {} }));
+      for (const dialect of ["postgres", "bigquery", "mysql"] as const) {
+        const sql = problem.review.sql[dialect];
+        if (!sql) {
+          failures++;
+          line.push(`review ${dialect} 없음`);
+          continue;
+        }
+        const applies = (ref: LineRef) => !ref.dialects || ref.dialects.includes(dialect);
+        const textLines = sql.split("\n");
+        const owner = new Map<number, string>();
+        const resolve = (ref: LineRef, label: string) => {
+          if (!applies(ref)) return;
+          const found = textLines.flatMap((t, i) => (ref.match.some((m) => t.toLowerCase().includes(m.toLowerCase())) ? [i + 1] : []));
+          if (!found.length) {
+            failures++;
+            line.push(`review ${dialect} "${label}" 줄을 찾지 못함`);
+          }
+          for (const n of found) {
+            if (owner.has(n)) {
+              failures++;
+              line.push(`review ${dialect} ${n}번째 줄이 "${owner.get(n)}" 와 "${label}" 에 겹침`);
+            }
+            owner.set(n, label);
+          }
+          ref.lines[dialect] = found;
+        };
+        for (const d of defects) resolve(d, d.title);
+        for (const d of decoys) resolve(d, `오탐 ${d.explanation.slice(0, 16)}`);
+        if (!defects.some(applies)) {
+          failures++;
+          line.push(`review ${dialect} 에 해당하는 결함이 없음`);
+        }
+        if (!/\border\s+by\b/i.test(sql)) {
+          failures++;
+          line.push(`review ${dialect} ORDER BY 가 없음`);
+        }
+        if (dialect === "mysql" && !mysql) {
+          line.push("review MySQL 건너뜀");
+          continue;
+        }
+        const res = await run(dialect, sql);
+        if (res instanceof Error) {
+          failures++;
+          line.push(`review ${dialect} 실패: ${res.message.split("\n")[0].slice(0, 80)}`);
+          continue;
+        }
+        const anomalyRows = multisetExtraIndexes(expected.rows, res.rows, expected.tolerance);
+        results[dialect] = { columns: res.columns, rows: res.rows, anomalyRows };
+        line.push(`review ${dialect} ${res.rows.length}행 이상 ${anomalyRows.length}행`);
+        if (compareResult({ ...expected, ordered: false }, res).pass) {
+          failures++;
+          line.push(`경고: review ${dialect} 결과가 정답과 같습니다`);
+        }
+        if (res.rows.length > 40) {
+          failures++;
+          line.push(`경고: review ${dialect} 결과는 40행 이하여야 합니다`);
+        }
+      }
+      review = { ...raw.review, defects, decoys, results };
+    }
+
+    const out = { ...raw, expected, wrongPatterns, ...(input ? { input } : {}), ...(spot ? { spot } : {}), ...(review ? { review } : {}) };
     writeFileSync(file, JSON.stringify(out, null, 2) + "\n");
     summary.push(line.join(" | "));
   }

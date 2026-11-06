@@ -16,6 +16,11 @@ description: SQL JD Trainer 문제·시드 작성과 검증 절차 (content JSON
   - wrongPatterns[{label, explanation, sql{postgres}}]: resultHash는 빌드가 채운다. 문제당 2~3개, 시드 함정 행이 드러나는 실수로 만든다
   - predict(출력 예측): input{title, sql{postgres}} 에 보여줄 입력 표 쿼리(1~30행), solutions 에 예측 대상 쿼리. 입력 표만 보고 결과를 셀 수 있어야 하므로 같은 필터를 쓴다
   - spot(결과 이상 찾기): spot{sql{postgres,bigquery,mysql}} 에 잘못된 쿼리(ORDER BY 필수, 40행 이하), solutions 에 올바른 쿼리. 빌드가 spot.rows 와 anomalyRows(정답에 없는 행)를 채운다. 틀린 값이 행으로 남는 실수(팬아웃, COUNT(*), 경계 누락)를 고른다. 행이 통째로 빠지는 실수는 고를 행이 없어 부적합
+  - review(쿼리 리뷰): review{sql{postgres,bigquery,mysql}} 에 결함을 심은 그럴듯한 쿼리(ORDER BY 필수, 결과 40행 이하), solutions 에 고친 쿼리, requirements 에 쿼리가 구현해야 할 지표 정의를 둔다.
+    - review.defects[{category, match[], title, explanation, dialects?}]: category 는 fanout|duplicate|null|int-division|boundary|join|definition. match 는 결함 줄을 찾는 문자열(대소문자 무시, 하나라도 들어 있으면 그 줄). 결과가 드러나는 줄을 모두 잡게 여러 개 둔다(예: 팬아웃은 JOIN 줄과 SUM 줄). 방언에 따라 결함이 아닌 경우(정수 나눗셈은 postgres 만) dialects 로 좁힌다
+    - review.decoys[{match[], explanation, dialects?}]: 의심스러워 보이지만 맞는 줄. 결함만 표시하는 것이 아니라 맞는 줄을 가려내는 연습이 되게 문제마다 1~3개
+    - 빌드가 방언별 lines(1부터)와 results{columns, rows, anomalyRows} 를 채운다. 한 방언에서 결함·맞는 줄이 서로 겹치면 실패하므로 한 줄에 결함 하나만 둔다. 결함마다 시드 데이터에서 결과가 실제로 달라지는지 PGlite 로 먼저 확인한다(데이터에 안 드러나는 결함은 심지 않는다)
+    - PostgreSQL 판에서 DATE(x) 는 양식 통일이 DATE (x) 로 바꾸므로 x::date 로 쓴다
   - explanation: "결과 / 조회 기준 / 인사이트" 세 줄로 시작하고 풀이 핵심을 덧붙인다
   - dialectNotes{postgres, bigquery, mysql}
 - `content/sets/<id>.json`: problems 배열에 id를 넣는다. category(basics|job|kpi|archive)와 order 를 둔다. mock 세트는 timeLimitMin을 둔다.
@@ -41,5 +46,5 @@ MYSQL_URL='mysql://root:sjt@127.0.0.1:3307/' npx tsx scripts/build-expected.ts <
 - 오답 진단 적중률: `npx tsx scripts/eval-diagnose.ts`. content/eval/wrong-queries.json 에 wrongPatterns와 다른 형태로 같은 실수를 저지른 쿼리와 기대 라벨을 둔다. 목표 80% 이상.
 - 카드: `MYSQL_URL=... npx tsx scripts/build-cards.ts` 가 "모두 통과 (N장)".
 - 여러 스키마를 한 번에 돌릴 때는 접두사를 여러 개 준다: `build-expected.ts ba bb ja jb k-`. 파일명 접두사로 거르므로 작업 중인 다른 파일을 건드리지 않는다.
-- 게시: `npx tsx scripts/publish-content.ts --dry-run` 으로 검증한 뒤 `--revalidate https://sql-jd-trainer.vercel.app` 로 DB 반영과 캐시 무효화. 로컬 dev 도 같은 DB 를 읽으므로 화면 확인 전에 게시한다.
+- 게시: `npx tsx scripts/publish-content.ts --dry-run` 으로 검증한 뒤 `--revalidate https://sql-jd-trainer.vercel.app` 로 DB 반영과 캐시 무효화. 게시 전 화면 확인은 `CONTENT_SOURCE=local npx next dev -p 3100`(개발 모드에서만 로컬 content/ 를 읽음). 새 형식·분류를 쓰는 콘텐츠는 그 코드가 운영에 배포된 뒤에 게시한다.
 - UI 확인은 `npx next dev -p 3100` 후 `npx playwright test`. 새 스키마는 `e2e/schemas.spec.ts` 가 자동으로 한 문제씩 브라우저에서 채점한다.

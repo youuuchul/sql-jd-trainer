@@ -13,6 +13,7 @@ import { McqProblem } from "./McqProblem";
 import { PredictProblem } from "./PredictProblem";
 import { ProblemPanel } from "./ProblemPanel";
 import { ResultGrid } from "./ResultGrid";
+import { ReviewChecklist, ReviewProblem } from "./ReviewProblem";
 import { SchemaPanel } from "./SchemaPanel";
 import { SpotProblem } from "./SpotProblem";
 import { SqlEditor } from "./SqlEditor";
@@ -100,6 +101,7 @@ export function Workspace({ problem, schema, mode = "practice", index, total, on
     <div className="space-y-6">
       <ProblemPanel problem={problem} index={index} total={total} />
       {problem.format === "mcq" && <McqProblem problem={problem} onGraded={onGraded} />}
+      {problem.format === "review" && <ReviewChecklist />}
     </div>
   );
 
@@ -108,6 +110,8 @@ export function Workspace({ problem, schema, mode = "practice", index, total, on
       <PredictProblem problem={problem} dialect={dialect} onDialectChange={setDialect} status={status} execute={execute} mode={mode} onGraded={onGraded} />
     ) : problem.format === "spot" ? (
       <SpotProblem problem={problem} dialect={dialect} onDialectChange={setDialect} status={status} mode={mode} onGraded={onGraded} />
+    ) : problem.format === "review" ? (
+      <ReviewProblem problem={problem} schema={schema} dialect={dialect} onDialectChange={setDialect} status={status} execute={execute} mode={mode} onGraded={onGraded} />
     ) : null;
 
   const editorColumn =

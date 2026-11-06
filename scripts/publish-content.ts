@@ -10,7 +10,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { loadEnvConfig } from "@next/env";
 import { neon } from "@neondatabase/serverless";
-import { CardDeckSchema, ProblemSchema, ProblemSetSchema, SchemaDefSchema, SyntaxRefSchema } from "../lib/content/types";
+import { CardDeckSchema, DIALECTS, ProblemSchema, ProblemSetSchema, SchemaDefSchema, SyntaxRefSchema } from "../lib/content/types";
 
 loadEnvConfig(process.cwd(), true);
 
@@ -36,6 +36,15 @@ const collect = (): Row[] => {
     if (p.format !== "mcq" && !p.expected?.rows.length) throw new Error(`${file}: expected 결과가 없습니다. build-expected 를 먼저 실행하세요.`);
     if (p.format === "predict" && !p.input?.rows.length) throw new Error(`${file}: predict 문제는 input 표가 필요합니다.`);
     if (p.format === "spot" && !p.spot?.anomalyRows.length) throw new Error(`${file}: spot 문제는 spot.anomalyRows 가 필요합니다.`);
+    if (p.format === "review") {
+      if (!p.review) throw new Error(`${file}: review 문제는 review 가 필요합니다.`);
+      for (const d of DIALECTS) {
+        if (!p.review.sql[d]) continue;
+        if (!p.review.results[d]) throw new Error(`${file}: review.results.${d} 가 없습니다. MYSQL_URL 을 주고 build-expected 를 실행하세요.`);
+        for (const ref of [...p.review.defects, ...p.review.decoys])
+          if ((!ref.dialects || ref.dialects.includes(d)) && !ref.lines[d]?.length) throw new Error(`${file}: review 줄(${ref.match[0]})이 ${d} 에서 풀리지 않았습니다.`);
+      }
+    }
     if (problemIds.has(p.id)) throw new Error(`${file}: 문제 id 중복 ${p.id}`);
     problemIds.add(p.id);
     rows.push({ kind: "problem", id: p.id, body: p });

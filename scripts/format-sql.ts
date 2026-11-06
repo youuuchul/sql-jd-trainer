@@ -1,5 +1,5 @@
 /**
- * 화면에 보이는 예시 SQL(카드 template, 문제 solutions·starterSql·spot.sql)을 한 가지 양식으로 맞춘다.
+ * 화면에 보이는 예시 SQL(카드 template, 문제 solutions·starterSql·spot.sql·review.sql)을 한 가지 양식으로 맞춘다.
  * 실행: npx tsx scripts/format-sql.ts          # 제자리 수정
  *       npx tsx scripts/format-sql.ts --check  # 바뀔 파일만 출력하고 있으면 exit 1
  *
@@ -276,6 +276,13 @@ const main = () => {
           p.spot.sql[d] = formatSql(p.spot.sql[d], d as Dialect, PROBLEM_WIDTH);
         } catch (e) {
           failed.push(`${p.id} spot.${d}: ${(e as Error).message.split("\n")[0]}`);
+        }
+      }
+      for (const d of Object.keys(p.review?.sql ?? {})) {
+        try {
+          p.review.sql[d] = formatSql(p.review.sql[d], d as Dialect, PROBLEM_WIDTH);
+        } catch (e) {
+          failed.push(`${p.id} review.${d}: ${(e as Error).message.split("\n")[0]}`);
         }
       }
       write(file, before, p);

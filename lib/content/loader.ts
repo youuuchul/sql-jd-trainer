@@ -14,13 +14,18 @@ interface Content {
   syntax: SyntaxRef[];
 }
 
+const readDb = async () => {
+  const url = process.env.DATABASE_URL;
+  if (!url) throw new Error("DATABASE_URL 이 없습니다. 콘텐츠 DB 를 연결하세요.");
+  return (await neon(url)`SELECT kind, body FROM content_item ORDER BY kind, id`) as { kind: string; body: unknown }[];
+};
+
+/** 개발 모드에서 CONTENT_SOURCE=local 이면 게시 전 로컬 content/ 를 읽는다 */
 const loadContent = async (): Promise<Content> => {
   "use cache";
   cacheLife("max");
   cacheTag(CONTENT_TAG);
-  const url = process.env.DATABASE_URL;
-  if (!url) throw new Error("DATABASE_URL 이 없습니다. 콘텐츠 DB 를 연결하세요.");
-  const rows = (await neon(url)`SELECT kind, body FROM content_item ORDER BY kind, id`) as { kind: string; body: unknown }[];
+  const rows = process.env.NODE_ENV === "development" && process.env.CONTENT_SOURCE === "local" ? (await import("./local")).readLocalContent() : await readDb();
   const of = (kind: string) => rows.filter((r) => r.kind === kind).map((r) => r.body);
   return {
     schemas: of("schema").map((b) => SchemaDefSchema.parse(b)),
