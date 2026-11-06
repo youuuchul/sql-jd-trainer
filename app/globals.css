@@ -17,6 +17,15 @@ body {
   line-break: strict;
   min-height: 100vh;
 }
+/* 고정폭 글꼴은 자간을 줄이지 않는다(빈칸 폭을 ch 로 맞춘다) */
+.font-mono,
+code,
+kbd,
+pre,
+samp,
+.cm-editor {
+  letter-spacing: 0;
+}
 ::selection {
   background: color-mix(in srgb, var(--color-accent) 40%, transparent);
 }

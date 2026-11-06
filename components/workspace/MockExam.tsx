@@ -144,7 +144,7 @@ export function MockExam({
 
   return (
     <div>
-      <div className="sticky top-14 z-20 border-b border-line bg-bg/95 backdrop-blur">
+      <div className="sticky top-0 z-20 border-b border-line bg-bg/95 backdrop-blur">
         <div className="mx-auto flex max-w-[1600px] flex-wrap items-center justify-between gap-3 px-5 py-2">
           <div className="flex items-center gap-1">
             {problems.map((p, i) => {
