@@ -3,11 +3,13 @@ import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { Selecky } from "@/components/selecky/Selecky";
 import { Button } from "@/components/ui/Button";
+import { Chip } from "@/components/ui/Chip";
 import { Icon } from "@/components/ui/icons";
 import type { CompetencyMatch, Recommendation } from "@/lib/jd/match";
 import { JD_MOCK_MAX_MIN, JD_MOCK_MAX_PROBLEMS, JD_MOCK_SET_ID, saveJdMockSet } from "@/lib/jd/mock-set";
-import { HighlightedText } from "./highlight";
+import { HighlightedBody } from "./highlight";
 import { RecList } from "./RecList";
+import { countSqlLines } from "./sqlTerms";
 
 const SAVE_HINT = "본문은 이 브라우저에만 저장됩니다";
 
@@ -24,6 +26,7 @@ export function JdAnalysis({ saved, matches, recs, minutes, onSubmit }: Props) {
   const router = useRouter();
   const boxRef = useRef<HTMLTextAreaElement>(null);
   const [draft, setDraft] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
   const text = draft ?? saved;
   const editing = !saved || draft !== null;
 
@@ -96,18 +99,32 @@ export function JdAnalysis({ saved, matches, recs, minutes, onSubmit }: Props) {
   }
 
   const keywords = (matches ?? []).flatMap((m) => m.matched);
+  const sqlLines = countSqlLines(saved);
+  const long = saved.split("\n").filter((l) => l.trim()).length > 8;
   return (
     <div className="mt-5 grid grid-cols-1 gap-6 lg:mt-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] lg:items-start">
       <div className="hq-card p-4 lg:p-5">
-        <div className="flex items-center justify-between">
-          <span className="text-[13px] font-semibold text-muted">공고 본문</span>
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <span className="text-[13px] font-semibold text-muted">공고 본문</span>
+            {sqlLines > 0 && (
+              <Chip tone="accent" size="sm">
+                SQL 관련 {sqlLines}줄
+              </Chip>
+            )}
+          </div>
           <Button tone="ghost" size="xs" onClick={() => setDraft(saved)}>
             수정
           </Button>
         </div>
-        <p className="mt-3 line-clamp-3 text-[15px] leading-[1.8] text-fg lg:line-clamp-none lg:whitespace-pre-wrap">
-          <HighlightedText text={saved} keywords={keywords} />
-        </p>
+        <div className={`relative mt-3 text-[15px] leading-[1.8] text-fg ${long && !open ? "max-h-[15rem] overflow-hidden lg:max-h-none lg:overflow-visible" : ""}`}>
+          <HighlightedBody text={saved} keywords={keywords} />
+        </div>
+        {long && (
+          <button type="button" aria-expanded={open} onClick={() => setOpen((v) => !v)} className="mt-2 text-[13.5px] font-semibold text-accent-ink lg:hidden">
+            {open ? "접기" : "전체 보기"}
+          </button>
+        )}
       </div>
 
       <div className="grid min-w-0 grid-cols-1 gap-6">
