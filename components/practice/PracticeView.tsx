@@ -118,20 +118,25 @@ function SetUnit({ sp, index, bubble }: { sp: SetPath; index: number; bubble: st
 
 function ArchiveList({ sets }: { sets: PathSet[] }) {
   return (
-    <ul className="mt-3 space-y-3">
-      {sets.map((s) => (
-        <li key={s.id}>
-          <Link href={`/sets/${s.id}`} className="hq-card flex items-center gap-3.5 p-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">
-            <PathNode state="lock" category="archive" size={44} />
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-[15px] font-extrabold tracking-[-0.02em]">{splitSetTitle(s.title, s.category).name}</span>
-              <span className="block truncate text-[12.5px] font-medium text-muted">{s.description}</span>
-            </span>
-            <span className="shrink-0 font-mono text-xs font-bold text-muted">{s.problemCount}문제</span>
-          </Link>
-        </li>
-      ))}
-    </ul>
+    <>
+      <ul className="mt-3 space-y-3">
+        {sets.map((s) => (
+          <li key={s.id}>
+            <Link href={`/sets/${s.id}`} className="hq-card flex items-center gap-3.5 p-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">
+              <PathNode state="lock" category="archive" size={44} />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[15px] font-extrabold tracking-[-0.02em]">{splitSetTitle(s.title, s.category).name}</span>
+                <span className="block truncate text-[12.5px] font-medium text-muted">{s.description}</span>
+              </span>
+              <span className="shrink-0 font-mono text-xs font-bold text-muted">{s.problemCount}문제</span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+      <div className="relative h-[170px] sm:h-[200px] lg:h-[240px]">
+        <PathScene art={sceneFor("archive", 0)} colored={false} side={0} />
+      </div>
+    </>
   );
 }
 
