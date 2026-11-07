@@ -31,7 +31,7 @@ function SetView({ set, schema, problems }: { set: ProblemSet; schema: SchemaDef
       </div>
       <div className={`${CAT_CLASS[set.category]} hq-catfill mt-4 rounded-[20px] px-[18px] pt-4 pb-[18px]`}>
         <div className="flex flex-wrap items-center gap-1.5">
-          {schema && <span className="rounded-full bg-white/20 px-2.5 py-0.5 text-xs font-bold dark:bg-surface-3">{schema.domain}</span>}
+          {schema && <span className="rounded-full bg-white/20 px-2.5 py-0.5 text-xs font-bold">{schema.domain}</span>}
           <span className="font-mono text-xs font-bold opacity-85">
             {problems.length}문제{minutes > 0 ? ` · 권장 ${minutes}분` : ""}
           </span>

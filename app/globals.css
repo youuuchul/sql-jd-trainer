@@ -247,10 +247,25 @@ samp,
     background: color-mix(in srgb, var(--cat) 12%, var(--color-surface));
   }
   @media (prefers-color-scheme: dark) {
+    /* 어두움도 꽉 찬 분류색. 흰 글자 4.5:1 이 되게 분류마다 검정을 섞고(--cat-dim), 어두운 글자를 쓰는 KPI 노랑은 그대로 */
+    .cat-basics {
+      --cat-dim: 76%;
+    }
+    .cat-job {
+      --cat-dim: 64%;
+    }
+    .cat-review {
+      --cat-dim: 74%;
+    }
+    .cat-archive {
+      --cat-dim: 80%;
+    }
+    .cat-kpi {
+      --cat-dim: 100%;
+    }
     .hq-catfill {
-      background: color-mix(in srgb, var(--cat) 17%, var(--color-surface));
-      color: var(--color-fg);
-      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cat) 34%, transparent);
+      background: color-mix(in srgb, var(--cat) var(--cat-dim, 80%), #000);
+      box-shadow: 0 4px 0 color-mix(in srgb, var(--cat) 45%, #000);
     }
     .hq-catink {
       color: var(--cat);
