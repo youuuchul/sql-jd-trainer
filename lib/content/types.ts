@@ -230,6 +230,10 @@ export const CardSchema = z.object({
   answers: z.array(z.string()).min(1),
   caseSensitive: z.boolean().default(false),
   hint: z.string(),
+  /** 추가 힌트 본문(함수 뜻·필요 인자 해석). 정답 문자열을 담지 않게 쓴다. 없으면 문법 참조의 뜻으로 대신한다 */
+  hintMore: z.string().optional(),
+  /** function: 함수 이해(함수 이름·인자를 묻는 카드), context: 맥락 이해. 없으면 화면에 라벨을 두지 않는다 */
+  kind: z.enum(["function", "context"]).optional(),
   explanation: z.string(),
   /** core: 실무에서 자주 쓰는 기본, applied: 응용. 새 카드는 core 위주로 나온다 */
   level: z.enum(["core", "applied"]).default("core"),

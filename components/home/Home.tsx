@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, type RefObject } from "react";
 import { Selecky } from "@/components/selecky/Selecky";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/icons";
@@ -24,13 +24,15 @@ export interface HomeProps {
   pathSets: PathSet[];
   onStart: () => void;
   onOpenSettings: () => void;
+  /** 설정 시트를 닫을 때 포커스가 돌아올 톱니 버튼 */
+  gearRef: RefObject<HTMLButtonElement | null>;
 }
 
 const greeting = ({ ready, goal, answered, dueCount, freshCount }: HomeProps): string => {
   if (!ready) return " ";
   const remaining = Math.max(goal - answered, 0);
-  if (!dueCount && !freshCount) return "풀 카드를 모두 익혔습니다";
   if (remaining === 0) return `오늘 목표 ${goal}장을 채웠습니다`;
+  if (!dueCount && !freshCount) return "지금 풀 카드가 없습니다";
   return `오늘 ${remaining}장 남았습니다`;
 };
 
@@ -39,12 +41,12 @@ const HERO_VARS =
   "dark:[--ring-trk:var(--color-surface-3)] dark:[--ring-bar:var(--color-accent)] dark:[--hsub:var(--color-muted)] dark:[--wk-off:var(--color-surface-3)] dark:[--wk-lbl:var(--color-muted)] dark:[--wk-today:var(--color-fg)]";
 
 export function Home(props: HomeProps) {
-  const { ready, dateLabel, goal, answered, streak, dueCount, freshCount, masteredCount, week, pathSets, onStart, onOpenSettings } = props;
+  const { ready, dateLabel, goal, answered, streak, dueCount, freshCount, masteredCount, week, pathSets, onStart, onOpenSettings, gearRef } = props;
   const { categories, next, inProgress } = usePath(pathSets);
   const [picked, setPicked] = useState<SetCategory | null>(null);
   const canStart = dueCount + freshCount > 0;
   const remaining = Math.max(goal - answered, 0);
-  const startLabel = !canStart ? "모든 카드를 익혔습니다" : remaining === 0 ? `${goal}장 더 풀기` : answered ? "이어서 풀기" : "시작하기";
+  const startLabel = !canStart ? "지금 풀 카드가 없습니다" : remaining === 0 ? `${goal}장 더 풀기` : answered ? "이어서 풀기" : "시작하기";
   const resume = inProgress.slice(0, next && !inProgress.some((n) => n.problem.id === next.problem.id) ? 2 : 3);
   const nextRow = next && !inProgress.some((n) => n.problem.id === next.problem.id) ? next : null;
   const pathCategory = picked ?? next?.set.category ?? categories.find((c) => !c.locked)?.category;
@@ -70,7 +72,7 @@ export function Home(props: HomeProps) {
             </span>
           </span>
         )}
-        <button type="button" onClick={onOpenSettings} aria-label="설정" className="grid size-10 shrink-0 place-items-center rounded-xl bg-surface text-fg-2 shadow-[inset_0_0_0_1.5px_var(--color-line-2),0_2px_0_var(--color-line-2)] dark:shadow-[inset_0_0_0_1px_var(--color-line-2)]">
+        <button ref={gearRef} type="button" onClick={onOpenSettings} aria-label="설정" className="grid size-10 shrink-0 place-items-center rounded-xl bg-surface text-fg-2 shadow-[inset_0_0_0_1.5px_var(--color-line-2),0_2px_0_var(--color-line-2)] dark:shadow-[inset_0_0_0_1px_var(--color-line-2)]">
           <Icon name="gear" size={21} />
         </button>
       </header>

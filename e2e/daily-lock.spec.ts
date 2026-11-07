@@ -2,6 +2,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { devices, expect, test, type Page } from "@playwright/test";
 import type { Card, SyntaxRef } from "../lib/content/types";
+import { maskAnswers } from "../lib/daily/srs";
 import { problem, set } from "./content";
 
 const DIR = "content/cards";
@@ -17,6 +18,27 @@ const shownCard = async (page: Page): Promise<Card> => {
 };
 const storedCard = (page: Page, id: string) => page.evaluate((cardId) => (JSON.parse(localStorage.getItem("sjt:daily:v1") ?? "{}") as { cards?: Record<string, { box: number; lapses: number }> }).cards?.[cardId], id);
 const slotCount = (page: Page) => page.locator("article [data-slot]").count();
+const byId = (id: string) => cards.find((c) => c.id === id)!;
+const syntaxSummary = new Map((JSON.parse(readFileSync("content/syntax/functions.json", "utf-8")) as SyntaxRef[]).map((s) => [s.id, s]));
+/** 지정한 카드들이 가장 먼저 나오도록 복습 시각이 지난 상태로 저장한다(격리된 브라우저의 저장값만 만든다) */
+const seedDue = (page: Page, ids: string[]) =>
+  page.addInitScript((list) => {
+    if (localStorage.getItem("sjt:daily:v1")) return;
+    const cardsState = Object.fromEntries(list.map((id, i) => [id, { box: 1, due: i + 1, reps: 1, lapses: 0, lastAt: 0 }]));
+    localStorage.setItem("sjt:daily:v1", JSON.stringify({ cards: cardsState, days: {}, settings: { goal: 5, dialect: "all" } }));
+  }, ids);
+/** 힌트 단계: 정답이 3글자 이상이면 앞글자 → 추가 힌트, 짧으면 바로 추가 힌트 */
+const openHints = async (page: Page, card: Card) => {
+  await page.getByRole("button", { name: "힌트" }).click();
+  if (card.answers[0].length >= 3) {
+    await expect(page.locator("article [data-first-letter]")).toHaveText(card.answers[0][0]);
+    await expect(page.getByText(card.hint)).toHaveCount(0);
+    await page.getByRole("button", { name: "추가 힌트" }).click();
+  } else {
+    await expect(page.locator("article [data-first-letter]")).toHaveCount(0);
+  }
+  await expect(page.getByText(card.hint)).toBeVisible();
+};
 const setGoal = async (page: Page, goal: string) => {
   await page.getByRole("button", { name: "설정" }).click();
   await page.getByRole("radio", { name: goal }).click();
@@ -88,8 +110,7 @@ test.describe("하루 카드 (모바일)", () => {
     await expect(article.getByRole("alert")).toContainText("정답과 1글자 달라요");
     await expect(page.getByRole("button", { name: "계속" })).toHaveCount(0);
     // 왼쪽 버튼은 힌트 → 힌트를 본 뒤에는 정답 보기
-    await page.getByRole("button", { name: "힌트" }).click();
-    await expect(page.getByText(first.hint)).toBeVisible();
+    await openHints(page, first);
     await page.getByRole("button", { name: "정답 보기" }).click();
     await expect(page.getByText("오답", { exact: true })).toBeVisible();
     await expect(page.getByText("5분 뒤 다시 나옵니다")).toBeVisible();
@@ -110,8 +131,7 @@ test.describe("하루 카드 (모바일)", () => {
       shown.push(card);
       await expect(page.locator("article").getByText("응용", { exact: true })).toHaveCount(card.level === "applied" ? 1 : 0);
       if (i === 0) {
-        await page.getByRole("button", { name: "힌트" }).click();
-        await expect(page.getByText(card.hint)).toBeVisible();
+        await openHints(page, card);
       }
       await page.getByLabel("빈칸").fill(card.answers[0]);
       await page.getByLabel("빈칸").press("Enter");
@@ -140,6 +160,55 @@ test.describe("하루 카드 (모바일)", () => {
     await page.reload();
     await expect(page.getByRole("progressbar", { name: "오늘 푼 카드" })).toHaveAttribute("aria-valuenow", "100");
     await expect(page.getByRole("button", { name: "5장 더 풀기" })).toBeVisible();
+  });
+
+  test("힌트는 앞글자 → 추가 힌트(말 설명·함수 뜻) → 정답 보기 순이고, 정답이 짧으면 앞글자를 건너뛴다", async ({ page }) => {
+    const short = byId("c-agg-count-star");
+    const long = byId("c-agg-count-distinct");
+    await seedDue(page, [short.id, long.id]);
+    await page.goto("/");
+    await page.addStyleTag({ content: "nextjs-portal { display: none !important; }" });
+    await page.getByRole("button", { name: "시작하기" }).click();
+
+    // 정답 '*' 은 앞글자가 곧 정답이라 바로 추가 힌트
+    expect((await shownCard(page)).id).toBe(short.id);
+    await openHints(page, short);
+    await expect(page.getByRole("button", { name: "정답 보기" })).toBeVisible();
+    await page.getByLabel("빈칸").fill(short.answers[0]);
+    await page.getByLabel("빈칸").press("Enter");
+    await expect(page.getByText("힌트를 쓴 정답")).toBeVisible();
+    await page.getByRole("button", { name: "계속" }).click();
+
+    // 정답 DISTINCT: 앞글자 D → 추가 힌트에 함수 뜻, 정답은 ___ 로 가려진다 → 정답 보기
+    expect((await shownCard(page)).id).toBe(long.id);
+    await expect(page.getByRole("button", { name: "정답 보기" })).toHaveCount(0);
+    await openHints(page, long);
+    const hintBox = page.locator("article").getByText(long.hint).locator("xpath=ancestor::div[1]");
+    await expect(hintBox).toContainText("첫 글자");
+    for (const id of long.syntax) await expect(hintBox).toContainText(maskAnswers(syntaxSummary.get(id)!.summary, long.answers));
+    await expect(hintBox).not.toContainText(new RegExp(`\\b${long.answers[0]}\\b`, "i"));
+    await expect(hintBox).toContainText("___");
+    await page.getByRole("button", { name: "정답 보기" }).click();
+    await expect(page.getByText("오답", { exact: true })).toBeVisible();
+  });
+
+  test("오답을 낸 카드에서 그만하면 틀린 카드로 기록하고, 오답 없이 그만하면 기록하지 않는다", async ({ page }) => {
+    const [a, b] = [byId("c-agg-count-star"), byId("c-agg-count-distinct")];
+    await seedDue(page, [a.id, b.id]);
+    await page.goto("/");
+    await page.addStyleTag({ content: "nextjs-portal { display: none !important; }" });
+    await page.getByRole("button", { name: "시작하기" }).click();
+    await expect(page.getByLabel("빈칸")).toBeVisible();
+    // 오답 없이 나가기: 기록 없음(시드 상태 그대로)
+    await page.getByRole("button", { name: "그만하기" }).click();
+    expect(await storedCard(page, a.id)).toMatchObject({ box: 1, lapses: 0 });
+    // 오답을 낸 뒤 나가기: wrong(상자 0, lapses 1)
+    await page.getByRole("button", { name: "이어서 풀기" }).or(page.getByRole("button", { name: "시작하기" })).click();
+    await page.getByLabel("빈칸").fill("zzz_wrong");
+    await page.getByLabel("빈칸").press("Enter");
+    await expect(page.locator("article").getByRole("alert")).toBeVisible();
+    await page.getByRole("button", { name: "그만하기" }).click();
+    expect(await storedCard(page, a.id)).toMatchObject({ box: 0, lapses: 1 });
   });
 
   test("오답을 낸 뒤 맞혀도 기록은 틀린 카드(5분 뒤 복습)이고, 하루 풀이 수에는 한 장으로 센다", async ({ page }) => {

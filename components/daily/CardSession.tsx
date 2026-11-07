@@ -8,7 +8,7 @@ import { Note } from "@/components/ui/Note";
 import { ResultSheet } from "@/components/ui/ResultSheet";
 import { useHideTabBar } from "@/components/shell/tabbar";
 import { DIALECT_LABEL, type Card, type SyntaxRef } from "@/lib/content/types";
-import { answerDistance, intervalLabel, isCorrect, MASTERED_BOX, schedule, type CardState, type DialectFilter, type Outcome } from "@/lib/daily/srs";
+import { answerDistance, FIRST_LETTER_MIN_LEN, intervalLabel, isCorrect, MASTERED_BOX, maskAnswers, schedule, type CardState, type DialectFilter, type Outcome } from "@/lib/daily/srs";
 import { Blank, CardCode } from "./CardCode";
 import { ReviewLadder } from "./ReviewLadder";
 import "./daily.css";
@@ -46,6 +46,8 @@ interface Finish {
   prevBox: number;
 }
 
+const KIND_LABEL = { function: "함수 이해", context: "맥락 이해" } as const;
+
 const DIALECT_TONE: Record<string, string> = {
   postgres: "text-dialect-pg",
   bigquery: "text-dialect-bq",
@@ -70,7 +72,8 @@ export function CardSession({ queue: initial, syntax, dialectFilter, onAnswer, o
   const [queue, setQueue] = useState(initial);
   const [pos, setPos] = useState(0);
   const [input, setInput] = useState("");
-  const [hint, setHint] = useState(false);
+  /** 0 없음, 1 앞글자, 2 추가 힌트(말 설명·함수 뜻). 정답이 짧으면 앞글자를 건너뛴다 */
+  const [hintStep, setHintStep] = useState<0 | 1 | 2>(0);
   const [focused, setFocused] = useState(false);
   /** 지금 입력이 오답으로 표시된 상태. 입력을 고치면 풀린다 */
   const [marked, setMarked] = useState(false);
@@ -81,16 +84,21 @@ export function CardSession({ queue: initial, syntax, dialectFilter, onAnswer, o
   const [retried, setRetried] = useState<Set<string>>(new Set());
   const states = useRef(new Map<string, CardState | undefined>());
   const inputRef = useRef<HTMLInputElement>(null);
+  const actionRef = useRef<HTMLSpanElement>(null);
 
   const card = queue[pos];
   const isRetry = card ? queue.findIndex((c) => c.id === card.id) < pos : false;
 
   useEffect(() => {
-    if (!finish) inputRef.current?.focus();
+    // 결과 아래 해설·문법을 읽도록 계속 버튼으로 화면을 내리지 않는다
+    if (finish) actionRef.current?.querySelector("button")?.focus({ preventScroll: true });
+    else inputRef.current?.focus();
   }, [finish, pos]);
 
   if (!card) return null;
   const answer = card.answers[0];
+  const hint = hintStep > 0;
+  const canFirstLetter = answer.length >= FIRST_LETTER_MIN_LEN;
   const refs = card.syntax.map((id) => syntax[id]).filter((r): r is SyntaxRef => r !== undefined);
 
   const complete = (outcome: Outcome, gaveUp: boolean) => {
@@ -122,6 +130,17 @@ export function CardSession({ queue: initial, syntax, dialectFilter, onAnswer, o
     inputRef.current?.focus();
   };
 
+  /** 오답을 낸 카드에서 나가면 정답 보기와 같이 wrong 으로 남긴다. 오답이 없었으면 기록하지 않는다 */
+  const leave = () => {
+    if (finish || wrongCount === 0) {
+      onExit(results);
+      return;
+    }
+    const firstTry = !results.some((r) => r.cardId === card.id);
+    onAnswer(card, "wrong", firstTry);
+    onExit(firstTry ? [...results, { cardId: card.id, outcome: "wrong" }] : results);
+  };
+
   const next = () => {
     if (pos + 1 >= queue.length) {
       onExit(results);
@@ -129,7 +148,7 @@ export function CardSession({ queue: initial, syntax, dialectFilter, onAnswer, o
     }
     setPos(pos + 1);
     setInput("");
-    setHint(false);
+    setHintStep(0);
     setMarked(false);
     setWrongCount(0);
     setLastWrong(null);
@@ -180,7 +199,7 @@ export function CardSession({ queue: initial, syntax, dialectFilter, onAnswer, o
   return (
     <div className="mx-auto flex w-full max-w-lg flex-1 flex-col px-4 pt-3 pb-6 lg:pt-8">
       <div className="flex h-14 items-center gap-3.5 lg:h-12">
-        <button type="button" onClick={() => onExit(results)} aria-label="그만하기" className="-ml-1 inline-flex h-10 w-10 items-center justify-center rounded-xl text-muted hover:bg-surface-2 hover:text-fg">
+        <button type="button" onClick={leave} aria-label="그만하기" className="-ml-1 inline-flex h-10 w-10 items-center justify-center rounded-xl text-muted hover:bg-surface-2 hover:text-fg">
           <Icon name="x" size={26} />
         </button>
         <div className="relative h-4 flex-1 overflow-hidden rounded-[9px] bg-surface-3" role="progressbar" aria-label="오늘의 카드 진행" aria-valuemin={0} aria-valuemax={queue.length} aria-valuenow={done}>
@@ -197,6 +216,7 @@ export function CardSession({ queue: initial, syntax, dialectFilter, onAnswer, o
         <div className="mx-0.5 flex h-[26px] items-center gap-2 text-[13px] font-semibold text-muted">
           <span className="truncate">{card.deckTitle}</span>
           <span className={`shrink-0 ${DIALECT_TONE[card.dialect]}`}>{card.dialect === "common" ? "공통" : DIALECT_LABEL[card.dialect]}</span>
+          {card.kind && <span className="shrink-0">{KIND_LABEL[card.kind]}</span>}
           {card.level === "applied" && <span className="shrink-0">응용</span>}
           <span className="ml-auto shrink-0">{chip}</span>
         </div>
@@ -204,11 +224,31 @@ export function CardSession({ queue: initial, syntax, dialectFilter, onAnswer, o
         {hint && !finish && (
           <Note className="mb-3 flex gap-2 !py-2.5 text-[13.5px]">
             <Icon name="bulb" size={16} className="mt-0.5 shrink-0" />
-            {card.hint}
+            <div className="min-w-0">
+              {canFirstLetter && (
+                <p>
+                  첫 글자 <b data-first-letter="" className="font-mono">{answer[0]}</b>
+                </p>
+              )}
+              {hintStep === 2 && (
+                <>
+                  <p className={canFirstLetter ? "mt-1.5" : ""}>{card.hint}</p>
+                  {card.hintMore ? (
+                    <p className="mt-1.5">{card.hintMore}</p>
+                  ) : (
+                    refs.map((ref) => (
+                      <p key={ref.id} className="mt-1.5 text-[13px] leading-snug">
+                        <b>{maskAnswers(ref.title, card.answers)}</b> {maskAnswers(ref.summary, card.answers)}
+                      </p>
+                    ))
+                  )}
+                </>
+              )}
+            </div>
           </Note>
         )}
         <div className="relative rounded-[14px] bg-code-bg p-3 shadow-[inset_0_0_0_1px_var(--color-line)]">
-          <CardCode template={card.template} blank={<Blank value={finish ? answer : input} length={answer.length} state={blankState} focused={focused} />} />
+          <CardCode template={card.template} blank={<Blank value={finish?.gaveUp ? answer : input} length={answer.length} state={blankState} focused={focused} />} />
           {!finish && (
             <input
               ref={inputRef}
@@ -246,12 +286,17 @@ export function CardSession({ queue: initial, syntax, dialectFilter, onAnswer, o
 
       {!finish && (
         <div className="mt-auto flex gap-2 pt-6">
-          {hint ? (
+          {hintStep === 2 ? (
             <Button tone="ghost" size="sm" onClick={() => complete("wrong", true)}>
               정답 보기
             </Button>
+          ) : hintStep === 1 ? (
+            <Button tone="ghost" size="sm" onClick={() => setHintStep(2)}>
+              <Icon name="bulb" size={18} />
+              추가 힌트
+            </Button>
           ) : (
-            <Button tone="ghost" size="sm" onClick={() => setHint(true)}>
+            <Button tone="ghost" size="sm" onClick={() => setHintStep(canFirstLetter ? 1 : 2)}>
               <Icon name="bulb" size={18} />
               힌트
             </Button>
@@ -268,9 +313,11 @@ export function CardSession({ queue: initial, syntax, dialectFilter, onAnswer, o
           tone={passTone ? "pass" : "fail"}
           className="max-h-[88dvh] overflow-y-auto"
           action={
-            <Button full tone={passTone ? "pass" : "fail"} onClick={next} autoFocus>
-              {pos + 1 >= queue.length ? "결과 보기" : "계속"}
-            </Button>
+            <span ref={actionRef} className="contents">
+              <Button full tone={passTone ? "pass" : "fail"} onClick={next}>
+                {pos + 1 >= queue.length ? "결과 보기" : "계속"}
+              </Button>
+            </span>
           }
         >
           <div className="flex items-center gap-4">
