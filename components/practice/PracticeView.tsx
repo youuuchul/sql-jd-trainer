@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useLayoutEffect, useMemo, useSyncExternalStore, type CSSProperties } from "react";
 import { PathScene } from "@/components/path/PathScene";
 import { sceneFor } from "@/components/path/scenes";
 import { CAT_CLASS, CAT_SHORT } from "@/components/ui/category";
@@ -16,10 +16,6 @@ import { usePath, type CategoryPath, type PathNode as PathNodeData, type PathSet
 const WAVE = [0, 0.5, 0.86, 0.5, 0, -0.5, -0.86, -0.5];
 /** 장면을 붙이는 기준 노드(세트의 3번째, 짧으면 마지막) */
 const sceneIndex = (n: number) => Math.min(2, n - 1);
-
-/** 분류색 꽉 찬 면. 어두움은 흰 글자가 읽히게 조금 눌러 쓴다(어두운 글자를 쓰는 KPI 노랑은 그대로) */
-const solid = (c: SetCategory) =>
-  `bg-[var(--cat)] text-[var(--cat-on,#fff)] shadow-[0_4px_0_color-mix(in_srgb,var(--cat)_68%,#000)] dark:shadow-[0_4px_0_color-mix(in_srgb,var(--cat)_45%,#000)] ${c === "kpi" ? "" : "dark:bg-[color-mix(in_srgb,var(--cat)_80%,#000)]"}`;
 
 const nodeMeta = (n: PathNodeData) => `${FORMAT_LABEL[n.problem.format]} · ${DIFFICULTY_LABEL[n.problem.difficulty]}${n.problem.timeLimitMin ? ` · ${n.problem.timeLimitMin}분` : ""}`;
 
@@ -62,10 +58,10 @@ function CategoryChip({ cat, on, onSelect }: { cat: CategoryPath; on: boolean; o
       </button>
     );
   return (
-    <button type="button" onClick={onSelect} aria-pressed={on} className={`${base} ${CAT_CLASS[cat.category]} ${on ? `${solid(cat.category)} shadow-none! dark:shadow-none!` : "bg-surface-2 text-fg-2"}`}>
+    <button type="button" onClick={onSelect} aria-pressed={on} className={`${base} ${CAT_CLASS[cat.category]} ${on ? "hq-catfill shadow-none!" : "bg-surface-2 text-fg-2"}`}>
       {!on && <i aria-hidden="true" className="size-2 rounded-full bg-[var(--cat)]" />}
       <b className="font-extrabold tracking-[-0.02em]">{SET_CATEGORY_LABEL[cat.category]}</b>
-      <span className={`font-mono text-[12px] font-bold tabular-nums ${on ? "opacity-80" : "text-muted"}`}>
+      <span className={`font-mono text-[12px] font-bold tabular-nums ${on ? "opacity-85" : "text-muted"}`}>
         {cat.passed}/{cat.total}
       </span>
     </button>
@@ -82,9 +78,9 @@ function SetUnit({ sp, index, bubble }: { sp: SetPath; index: number; bubble: st
   return (
     <section className={`${CAT_CLASS[set.category]} pb-6`} aria-labelledby={`set-${set.id}`}>
       <div className="sticky top-[env(safe-area-inset-top)] z-20 -mx-1 bg-bg px-1 pt-2 pb-1">
-        <div className={`${solid(set.category)} flex min-h-[78px] items-center gap-3 rounded-[18px] py-3 pr-3 pl-4`}>
+        <div className={`hq-catfill flex min-h-[78px] items-center gap-3 rounded-[18px] py-3 pr-3 pl-4`}>
           <div className="min-w-0 flex-1">
-            <p className="text-[12.5px] font-bold tracking-[0.01em] opacity-80">
+            <p className="text-[12.5px] font-bold tracking-[0.01em] opacity-85">
               {kicker} · <span className="font-mono tabular-nums">{sp.passed}/{sp.total}</span>
             </p>
             <h2 id={`set-${set.id}`} className="mt-0.5 text-[21px] leading-tight font-extrabold tracking-[-0.03em] [word-break:keep-all]">
@@ -122,39 +118,98 @@ function SetUnit({ sp, index, bubble }: { sp: SetPath; index: number; bubble: st
 
 function ArchiveList({ sets }: { sets: PathSet[] }) {
   return (
-    <ul className="mt-3 space-y-3">
-      {sets.map((s) => (
-        <li key={s.id}>
-          <Link href={`/sets/${s.id}`} className="hq-card flex items-center gap-3.5 p-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">
-            <PathNode state="lock" category="archive" size={44} />
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-[15px] font-extrabold tracking-[-0.02em]">{splitSetTitle(s.title, s.category).name}</span>
-              <span className="block truncate text-[12.5px] font-medium text-muted">{s.description}</span>
-            </span>
-            <span className="shrink-0 font-mono text-xs font-bold text-muted">{s.problemCount}문제</span>
-          </Link>
-        </li>
-      ))}
-    </ul>
+    <>
+      <ul className="mt-3 space-y-3">
+        {sets.map((s) => (
+          <li key={s.id}>
+            <Link href={`/sets/${s.id}`} className="hq-card flex items-center gap-3.5 p-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">
+              <PathNode state="lock" category="archive" size={44} />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[15px] font-extrabold tracking-[-0.02em]">{splitSetTitle(s.title, s.category).name}</span>
+                <span className="block truncate text-[12.5px] font-medium text-muted">{s.description}</span>
+              </span>
+              <span className="shrink-0 font-mono text-xs font-bold text-muted">{s.problemCount}문제</span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+      <div className="relative h-[170px] sm:h-[200px] lg:h-[240px]">
+        <PathScene art={sceneFor("archive", 0)} colored={false} side={0} />
+      </div>
+    </>
   );
 }
+
+/** 이 탭(세션) 안에서 고른 분류와 스크롤 위치. 새로고침·다른 탭에서 돌아와도 이어 보인다 */
+const VIEW_KEY = "hq:practice:view";
+type SavedView = { cat: SetCategory | null; y: number | null };
+const viewListeners = new Set<() => void>();
+let viewRaw: string | null = null;
+const readViewRaw = () => {
+  try {
+    viewRaw = sessionStorage.getItem(VIEW_KEY);
+  } catch {
+    viewRaw = null;
+  }
+  return viewRaw;
+};
+const parseView = (raw: string | null): SavedView => {
+  try {
+    return { cat: null, y: null, ...(JSON.parse(raw ?? "{}") as Partial<SavedView>) };
+  } catch {
+    return { cat: null, y: null };
+  }
+};
+const writeView = (patch: Partial<SavedView>) => {
+  const next = JSON.stringify({ ...parseView(viewRaw ?? readViewRaw()), ...patch });
+  viewRaw = next;
+  try {
+    sessionStorage.setItem(VIEW_KEY, next);
+  } catch {
+    // 저장할 수 없는 환경에서도 이 화면 안에서는 선택이 유지된다
+  }
+  if (patch.cat !== undefined) viewListeners.forEach((l) => l());
+};
+const subscribeView = (l: () => void) => {
+  viewListeners.add(l);
+  return () => viewListeners.delete(l);
+};
+const noSubscribe = () => () => {};
 
 /** 연습 탭: 상태 줄, 분류 칩, 선택한 분류의 세트별 배너와 사인파 경로. 순서는 권장만이라 모두 열려 있고 잠김은 비공개 분류뿐이다 */
 export function PracticeView({ sets }: { sets: PathSet[] }) {
   const { categories } = usePath(sets);
-  const [picked, setPicked] = useState<SetCategory | null>(null);
+  const hydrated = useSyncExternalStore(noSubscribe, () => true, () => false);
+  const picked = parseView(useSyncExternalStore(subscribeView, () => viewRaw ?? readViewRaw(), () => null)).cat;
   const selected = categories.find((c) => c.category === picked) ?? categories.find((c) => !c.locked && c.current) ?? categories.find((c) => !c.locked) ?? categories[0];
   const cur = selected && !selected.locked ? selected.current : null;
   const started = !!selected && selected.sets.some((s) => s.nodes.some((n) => n.progress));
-  const scrolled = useRef("");
+  const curId = cur && cur.set.id !== selected?.sets[0]?.set.id ? cur.problem.id : null;
 
-  useEffect(() => {
-    if (!cur || cur.set.id === selected?.sets[0]?.set.id) return;
-    const key = `${cur.set.category}:${cur.problem.id}`;
-    if (scrolled.current === key) return;
-    scrolled.current = key;
-    document.querySelector(`a[href="/problems/${cur.problem.id}"][aria-current="step"]`)?.scrollIntoView({ block: "center" });
-  }, [cur, selected]);
+  /** 세션 첫 방문에만 지금 노드를 가운데로, 그 뒤로는 저장한 위치로. 다른 화면에서 돌아와 다시 보일 때마다 실행된다 */
+  useLayoutEffect(() => {
+    if (!hydrated) return;
+    const { y } = parseView(readViewRaw());
+    let frame = 0;
+    const onScroll = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => writeView({ y: window.scrollY }));
+    };
+    // 라우터가 이동 직후 맨 위로 올리는 것보다 뒤에 맞추려고 다음 프레임에 둔다
+    const restore = requestAnimationFrame(() => {
+      if (y !== null) window.scrollTo(0, y);
+      else if (curId) document.querySelector(`a[href="/problems/${curId}"][aria-current="step"]`)?.scrollIntoView({ block: "center" });
+      writeView({ y: window.scrollY });
+      window.addEventListener("scroll", onScroll, { passive: true });
+    });
+    return () => {
+      cancelAnimationFrame(restore);
+      cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", onScroll);
+    };
+    // 지금 노드가 바뀌어도(문제를 풀고 돌아와도) 다시 맞추지 않는다
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hydrated]);
 
   return (
     <div className="w-full overflow-x-clip">
@@ -162,7 +217,7 @@ export function PracticeView({ sets }: { sets: PathSet[] }) {
         <StatusLine />
         <div className="-mx-5 flex gap-2 overflow-x-auto px-5 pt-1 pb-2 [scrollbar-width:none]">
           {categories.map((c) => (
-            <CategoryChip key={c.category} cat={c} on={c.category === selected?.category} onSelect={() => setPicked(c.category)} />
+            <CategoryChip key={c.category} cat={c} on={c.category === selected?.category} onSelect={() => writeView({ cat: c.category })} />
           ))}
         </div>
         {selected?.locked ? (

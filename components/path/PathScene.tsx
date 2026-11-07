@@ -26,16 +26,16 @@ function SeleckyStill({ art }: { art: Extract<SceneArt, { kind: "selecky" }> }) 
  * Args:
  *   art: 장면 그림.
  *   colored: 컬러로 보일지.
- *   side: 경로 기준 왼쪽 -1, 오른쪽 1.
+ *   side: 경로 기준 왼쪽 -1, 오른쪽 1, 가운데 0.
  */
-export function PathScene({ art, colored, side }: { art: SceneArt; colored: boolean; side: -1 | 1 }) {
+export function PathScene({ art, colored, side }: { art: SceneArt; colored: boolean; side: -1 | 0 | 1 }) {
   return (
     <span
       aria-hidden="true"
       data-colored={colored || undefined}
-      className={`pointer-events-none absolute top-1/2 left-1/2 z-0 size-[112px] -translate-y-1/2 transition-[filter,opacity] duration-700 ease-out select-none motion-reduce:transition-none sm:size-[170px] lg:size-[210px] ${side < 0 ? "-translate-x-[calc(50%+108px)] sm:-translate-x-[calc(50%+190px)] lg:-translate-x-[calc(50%+300px)]" : "translate-x-[calc(-50%+108px)] sm:translate-x-[calc(-50%+190px)] lg:translate-x-[calc(-50%+300px)]"} ${colored ? "" : "opacity-45 grayscale dark:opacity-35 dark:brightness-75"}`}
+      className={`pointer-events-none absolute top-1/2 left-1/2 z-0 size-[136px] -translate-y-1/2 transition-[filter,opacity] duration-700 ease-out select-none motion-reduce:transition-none sm:size-[170px] lg:size-[210px] ${side < 0 ? "-translate-x-[calc(50%+104px)] sm:-translate-x-[calc(50%+190px)] lg:-translate-x-[calc(50%+300px)]" : side > 0 ? "translate-x-[calc(-50%+104px)] sm:translate-x-[calc(-50%+190px)] lg:translate-x-[calc(-50%+300px)]" : "-translate-x-1/2"} ${colored ? "" : "opacity-45 grayscale dark:opacity-35 dark:brightness-75"}`}
     >
-      {art.kind === "image" ? <Image src={art.src} alt="" fill sizes="210px" className="object-contain" /> : <SeleckyStill art={art} />}
+      {art.kind === "image" ? <Image src={art.src} alt="" fill unoptimized className="object-contain" /> : <SeleckyStill art={art} />}
     </span>
   );
 }

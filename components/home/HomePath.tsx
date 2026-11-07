@@ -195,8 +195,8 @@ export function CategoryTiles({ categories }: { categories: CategoryPath[] }) {
               <span className="mt-0.5 text-[11.5px] font-semibold opacity-85">
                 {c.sets.length}세트 · {problems}문제
               </span>
-              <span className="mt-auto h-1.5 overflow-hidden rounded-[3px] bg-white/30 dark:bg-surface-3" aria-hidden="true">
-                <i className="block h-full rounded-[3px] bg-white dark:bg-[var(--cat)]" style={{ width: `${problems ? (c.passed / problems) * 100 : 0}%` }} />
+              <span className="mt-auto h-1.5 overflow-hidden rounded-[3px] bg-white/30" aria-hidden="true">
+                <i className="block h-full rounded-[3px] bg-white" style={{ width: `${problems ? (c.passed / problems) * 100 : 0}%` }} />
               </span>
               <em className="mt-1.5 font-mono text-[11.5px] leading-none font-bold not-italic opacity-90">
                 {c.passed} / {problems}
