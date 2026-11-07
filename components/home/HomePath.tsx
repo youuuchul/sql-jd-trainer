@@ -46,7 +46,7 @@ export function MobilePath({ set }: { set: SetPath }) {
         </div>
         <div className="relative grid h-[58px] items-center justify-items-center" style={{ gridTemplateColumns: `repeat(${n}, 1fr)` }}>
           {items.map((x) => (
-            <PathNode key={x.problem.id} state={x.state} category={x.set.category} icon={FORMAT_ICON[x.problem.format]} size={x.state === "cur" ? 56 : 44} href={`/problems/${x.problem.id}`} label={x.problem.title} />
+            <PathNode key={x.problem.id} state={x.state} category={x.set.category} icon={FORMAT_ICON[x.problem.format]} size={x.state === "cur" ? 46 : 38} href={`/problems/${x.problem.id}`} label={x.problem.title} />
           ))}
         </div>
         {cur && (
@@ -155,7 +155,7 @@ export function DesktopPath({ categories, category, onCategory }: { categories: 
                 <span style={{ marginTop: y }}>
                   <PathNode state={x.state} category={x.set.category} icon={FORMAT_ICON[x.problem.format]} size={cur ? 72 : 64} href={`/problems/${x.problem.id}`} label={x.problem.title} />
                 </span>
-                <p className="mt-3.5 max-w-[124px] text-[12.5px] leading-[1.4] font-semibold text-fg-2">
+                <p className={`${cur ? "mt-[30px]" : "mt-[22px]"} max-w-[124px] text-[12.5px] leading-[1.4] font-semibold text-fg-2`}>
                   {cur ? (
                     <>
                       <b className="block font-extrabold text-[color-mix(in_srgb,var(--cat)_84%,var(--color-fg))]">{x.problem.title}</b>

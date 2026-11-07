@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { ProblemFormat } from "@/lib/content/types";
 
 /** 시안 아이콘 세트(24 격자, 선 1.85). 경로는 시안 index.html 의 symbol 을 그대로 옮겼다 */
@@ -139,6 +140,65 @@ export const FORMAT_ICON: Record<ProblemFormat, IconName> = {
   spot: "spot",
   review: "review",
 };
+
+const BAR = { fill: "none", stroke: "currentColor", strokeLinecap: "round", strokeLinejoin: "round" } as const;
+
+/** 진행 경로 노드용 속 채운 글리프(24 격자). 선 아이콘은 PATHS 그대로 다른 곳에서 쓴다 */
+const GLYPHS = {
+  write: (
+    <>
+      <path d="M15.3 3.7a2.7 2.7 0 0 1 3.8 0l1.2 1.2a2.7 2.7 0 0 1 0 3.8L9.5 19.5l-5.6 1.4a.7.7 0 0 1-.8-.8l1.4-5.6Z" />
+      <path d="m13.2 5.8 5 5" {...BAR} style={{ stroke: "var(--glyph-cut, transparent)" }} strokeWidth={1.6} />
+    </>
+  ),
+  fix: <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.8-3.8a6 6 0 0 1-7.9 7.9l-6.9 6.9a2.1 2.1 0 0 1-3-3l6.9-6.9a6 6 0 0 1 7.9-7.9l-3.8 3.8Z" stroke="currentColor" strokeWidth={1.4} strokeLinejoin="round" />,
+  mcq: (
+    <>
+      <circle cx="6.4" cy="7" r="3.1" />
+      <circle cx="6.4" cy="17" r="3.1" />
+      <path d="M12.6 7h7.4M12.6 17h7.4" {...BAR} strokeWidth={3.4} />
+    </>
+  ),
+  predict: <path fillRule="evenodd" d="M6 3.8h12a2.8 2.8 0 0 1 2.8 2.8v10.8a2.8 2.8 0 0 1-2.8 2.8H6a2.8 2.8 0 0 1-2.8-2.8V6.6A2.8 2.8 0 0 1 6 3.8Zm-.3 6.9v6.4c0 .5.3.8.8.8h3v-7.2Zm6.3 0v7.2h5.5c.5 0 .8-.3.8-.8v-6.4Z" />,
+  spot: (
+    <>
+      <circle cx="10.3" cy="10.3" r="5.6" fill="currentColor" fillOpacity={0.38} stroke="currentColor" strokeWidth={3.2} />
+      <path d="m15.2 15.2 4.9 4.9" {...BAR} strokeWidth={3.8} />
+    </>
+  ),
+  review: (
+    <>
+      <path d="M4 6h11M4 12h6.5M4 18h8.5" {...BAR} strokeWidth={3.2} />
+      <path d="m14.4 15.2 2.6 2.6 4.6-5.2" {...BAR} strokeWidth={3.4} />
+    </>
+  ),
+  check: <path d="m5 12.6 4.4 4.4L19 7.4" {...BAR} strokeWidth={3.8} />,
+  lock: (
+    <>
+      <path d="M8.3 11V8.2a3.7 3.7 0 0 1 7.4 0V11" {...BAR} strokeWidth={2.9} />
+      <rect x="4.6" y="10" width="14.8" height="11" rx="3" />
+    </>
+  ),
+} satisfies Partial<Record<keyof typeof PATHS, ReactNode>>;
+
+export type GlyphName = keyof typeof GLYPHS;
+
+export const hasGlyph = (name: IconName): name is GlyphName => name in GLYPHS;
+
+/**
+ * 속 채운 글리프(진행 경로 노드). 색은 currentColor.
+ *
+ * Args:
+ *   name: 글리프 이름(형식 아이콘·check·lock).
+ *   size: 한 변 px.
+ */
+export function Glyph({ name, size = 28, className = "" }: { name: GlyphName; size?: number; className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} fill="currentColor" className={`shrink-0 overflow-visible ${className}`} aria-hidden>
+      {GLYPHS[name]}
+    </svg>
+  );
+}
 
 export interface IconProps {
   name: IconName;
