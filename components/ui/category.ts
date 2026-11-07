@@ -13,7 +13,7 @@ export const CAT_CLASS: Record<SetCategory, string> = {
 export const CAT_SHORT: Record<SetCategory, string> = {
   basics: "기초",
   job: "직무",
-  kpi: "KPI",
+  kpi: "대시보드",
   review: "쿼리 리뷰",
-  archive: "복습 아카이브",
+  archive: "비공개",
 };

@@ -49,7 +49,7 @@ const syntaxTitle = new Map((JSON.parse(readFileSync("content/syntax/functions.j
 test("연습: 분류 순서와 잠긴 세트 표시", async ({ page }) => {
   await page.goto("/practice");
   const cards = page.locator("button[aria-pressed] > b");
-  await expect(cards).toHaveText(["기초 문법", "직무별 실무", "KPI 대시보드", "쿼리 리뷰", "복습 아카이브"]);
+  await expect(cards).toHaveText(["기초 문법", "직무별 실무", "대시보드 재현", "쿼리 리뷰", "비공개"]);
   await expect(page.getByLabel("잠김")).toHaveCount(0);
   await cards.last().click();
   await expect(page.getByLabel("잠김")).toHaveCount(3);

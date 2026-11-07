@@ -7,7 +7,7 @@ async function Gate({ title, children }: { title: string; children: () => ReactN
   return children();
 }
 
-export const LOCKED_TITLE = "비공개 복습 아카이브";
+export const LOCKED_TITLE = "비공개 세트";
 
 /** 잠긴 스키마의 화면. 잠금이 풀린 요청에서만 render 를 호출하므로 문제 데이터가 정적 셸에 실리지 않는다. */
 export function LockGate({ locked, title, render }: { locked: boolean; title: string; render: () => ReactNode }) {
