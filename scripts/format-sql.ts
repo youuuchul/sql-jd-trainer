@@ -11,6 +11,8 @@
  * - WITH name AS ( 다음 줄부터 본문을 들여쓰고 ) 로 닫는다
  * - 폭 안에 들어가는 괄호식과 WHEN 하나짜리 CASE 는 한 줄
  * - 리터럴 데이터 행(FROM 없는 SELECT)은 한 줄에 한 행: UNION ALL SELECT 2, 'b'
+ * - 파이프라인 문제(script)는 최상위 ; 로 문장을 나눠 문장별로 맞춘다. 문장 사이 주석·빈 줄과 ; 뒤 줄 끝 주석은 그대로,
+ *   DECLARE·SET 은 한 줄(키워드·자료형만 대문자). 주석 줄이 든 괄호·CASE 는 접지 않는다
  */
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
@@ -48,7 +50,10 @@ const joinInline = (parts: string[]) =>
     .replace(/\s+\)/g, ")")
     .replace(/\s+,/g, ",");
 
-/** 폭 안에 들어가는 괄호식·CASE 를 한 줄로 접는다. 서브쿼리(SELECT 포함)는 접지 않는다 */
+/** 줄 주석·블록 주석이 있는 줄. 접으면 뒤 내용이 주석에 먹힌다 */
+const hasComment = (t: string) => /--|\/\*/.test(t.replace(/'(?:[^']|'')*'/g, "''"));
+
+/** 폭 안에 들어가는 괄호식·CASE 를 한 줄로 접는다. 서브쿼리(SELECT 포함)·주석이 든 블록은 접지 않는다 */
 const collapse = (lines: Line[], width: number): boolean => {
   for (let i = 0; i < lines.length; i++) {
     const l = lines[i];
@@ -59,6 +64,7 @@ const collapse = (lines: Line[], width: number): boolean => {
     const closer = lines[end];
     if (!closer || closer.indent !== l.indent || !(isParen ? closer.text.startsWith(")") : /^END\b/.test(closer.text))) continue;
     const inner = lines.slice(i + 1, end);
+    if ([l, ...inner, closer].some((x) => hasComment(x.text))) continue;
     if (inner.some((x) => /^(SELECT|WITH)\b/.test(x.text))) continue;
     if (inner.some((x) => x.text.endsWith("(") || /(^|\s|\()CASE$/.test(x.text))) continue;
     if (isCase && inner.filter((x) => x.text.startsWith("WHEN")).length > 1) continue;
@@ -93,7 +99,10 @@ const mergeRoot = (lines: Line[], width: number): boolean => {
     if (!ROOT.includes(l.text)) continue;
     const end = blockEnd(lines, i);
     if (end === i + 1) continue;
+    // 주석만 있는 줄을 키워드 줄로 올리면 뒤 내용이 주석에 먹힌다
+    if (lines[i + 1].text.startsWith("--")) continue;
     const its = items(lines, i + 1, end, l.indent);
+    const foldable = !lines.slice(i + 1, end - 1).some((x) => hasComment(x.text));
     const flat = its.every(([a, b]) => b - a === 1);
 
     if (l.text.startsWith("WITH")) {
@@ -106,7 +115,7 @@ const mergeRoot = (lines: Line[], width: number): boolean => {
         lines.splice(i, 2, { indent: l.indent, text: `${l.text} ${lines[i + 1].text}` });
         return true;
       }
-      if (flat && isLiteralSelect(lines, i, end)) {
+      if (flat && foldable && isLiteralSelect(lines, i, end)) {
         const joined = `${l.text} ${lines.slice(i + 1, end).map((x) => x.text).join(" ")}`;
         if (l.indent + joined.length <= width) {
           lines.splice(i, end - i, { indent: l.indent, text: joined });
@@ -115,7 +124,7 @@ const mergeRoot = (lines: Line[], width: number): boolean => {
       }
       continue;
     }
-    if (LIST_CLAUSES.has(l.text) && flat) {
+    if (LIST_CLAUSES.has(l.text) && flat && foldable) {
       const joined = `${l.text} ${lines.slice(i + 1, end).map((x) => x.text).join(" ")}`;
       if (l.indent + joined.length <= width) {
         lines.splice(i, end - i, { indent: l.indent, text: joined });
@@ -207,6 +216,81 @@ export const formatSql = (sql: string, dialect: Dialect, width: number): string 
   throw new Error("format loop did not settle");
 };
 
+/** 최상위 ; 로 나눈 원문 조각. 문자열·$$·주석 안의 ; 는 건너뛴다 */
+const splitRaw = (sql: string): { text: string; ended: boolean }[] => {
+  const out: { text: string; ended: boolean }[] = [];
+  let start = 0;
+  let i = 0;
+  while (i < sql.length) {
+    const ch = sql[i];
+    if (ch === "'" || ch === '"' || ch === "`") {
+      let j = i + 1;
+      while (j < sql.length && !(sql[j] === ch && sql[j + 1] !== ch)) j += sql[j] === ch ? 2 : 1;
+      i = j + 1;
+    } else if (ch === "$" && /^\$([A-Za-z_]\w*)?\$/.test(sql.slice(i))) {
+      const tag = sql.slice(i).match(/^\$([A-Za-z_]\w*)?\$/)![0];
+      const end = sql.indexOf(tag, i + tag.length);
+      i = end === -1 ? sql.length : end + tag.length;
+    } else if (ch === "-" && sql[i + 1] === "-") {
+      while (i < sql.length && sql[i] !== "\n") i++;
+    } else if (ch === "/" && sql[i + 1] === "*") {
+      const end = sql.indexOf("*/", i + 2);
+      i = end === -1 ? sql.length : end + 2;
+    } else if (ch === ";") {
+      out.push({ text: sql.slice(start, i), ended: true });
+      start = ++i;
+    } else i++;
+  }
+  if (start < sql.length) out.push({ text: sql.slice(start), ended: false });
+  return out;
+};
+
+const isCommentLine = (t: string) => /^\s*(--.*)?$/.test(t);
+const squash = (x: string) => x.replace(/\s+/g, "").toLowerCase();
+
+const VAR_TYPES = /\b(DATE|DATETIME|TIMESTAMP|TIME|STRING|BYTES|INT64|FLOAT64|NUMERIC|BIGNUMERIC|BOOL|ARRAY|STRUCT|INTERVAL)\b/gi;
+
+/** DECLARE·SET 은 한 줄로 두고 키워드·자료형만 대문자로 */
+const formatVarLine = (body: string): string => {
+  const one = body.trim().replace(/\s+/g, " ");
+  const parts = one.split(/('(?:[^']|'')*')/);
+  return parts
+    .map((part, i) => {
+      if (i % 2) return part;
+      let t = part.replace(/^(declare|set)\b/i, (k) => k.toUpperCase()).replace(/\bdefault\b/gi, "DEFAULT");
+      if (/^DECLARE\b/.test(one.toUpperCase()) && i === 0) t = t.replace(/^(DECLARE\s+[\w\s,]+?\s)(\w[\w<>, ]*?)(\s+DEFAULT\b|$)/, (_, a: string, ty: string, c: string) => a + ty.replace(VAR_TYPES, (x) => x.toUpperCase()) + c);
+      return t;
+    })
+    .join("");
+};
+
+/** 여러 문장 스크립트를 문장별로 맞춘다. 공백을 뺀 글자(대소문자 무시)가 원문과 달라지면 던진다 */
+export const formatScript = (sql: string, dialect: Dialect, width: number): string => {
+  const out: string[] = [];
+  for (const piece of splitRaw(sql)) {
+    const lines = piece.text.split("\n");
+    // ; 뒤 같은 줄의 주석은 앞 문장 줄 끝 주석
+    if (out.length && lines.length && lines[0].trim() && isCommentLine(lines[0])) {
+      out[out.length - 1] += ` ${lines[0].trim()}`;
+      lines.shift();
+    } else if (out.length && lines.length && !lines[0].trim()) lines.shift();
+    let k = 0;
+    while (k < lines.length && isCommentLine(lines[k])) k++;
+    const lead = lines.slice(0, k).map((l) => l.trimEnd());
+    const body = lines.slice(k).join("\n").trim();
+    if (!body) {
+      while (lead.length && !lead[lead.length - 1]) lead.pop();
+      out.push(...lead);
+      continue;
+    }
+    const formatted = /^(DECLARE|SET)\b/i.test(body) ? formatVarLine(body) : formatSql(body, dialect, width);
+    out.push(...lead, ...`${formatted}${piece.ended ? ";" : ""}`.split("\n"));
+  }
+  const result = out.join("\n");
+  if (squash(result) !== squash(sql.trim())) throw new Error("여러 문장 포맷 뒤 내용이 달라짐");
+  return result;
+};
+
 const BLANK = "___";
 const answerPattern = (answer: string) => new RegExp(answer.trim().split(/\s+/).map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("\\s+"), "gi");
 
@@ -222,8 +306,7 @@ export const formatTemplate = (template: string, answer: string, dialect: Dialec
   let out = formatted.slice(0, match.index) + BLANK + formatted.slice(match.index + match[0].length);
   // 표준 SQL 포맷은 모르는 함수 이름 뒤에 공백을 넣는다. 함수 이름 빈칸이면 괄호에 붙인다(MySQL 은 공백이 있으면 내장 함수로 보지 않는다)
   if (template.includes(`${BLANK}(`)) out = out.replace(`${BLANK} (`, `${BLANK}(`);
-  const squash = (x: string) => x.replace(/\s+/g, "").toLowerCase();
-  if (squash(out.replace(BLANK, answer)) !== squash(formatted)) throw new Error(`빈칸 복원 불일치: ${answer}`);
+    if (squash(out.replace(BLANK, answer)) !== squash(formatted)) throw new Error(`빈칸 복원 불일치: ${answer}`);
   return out;
 };
 
@@ -262,10 +345,20 @@ const main = () => {
       const file = path.join(probDir, group, f);
       const before = readFileSync(file, "utf-8");
       const p = JSON.parse(before);
+      const fmt = p.script ? formatScript : formatSql;
+      for (const v of p.script?.variants ?? []) {
+        for (const d of Object.keys(v.head ?? {})) {
+          try {
+            v.head[d] = formatScript(v.head[d], d as Dialect, PROBLEM_WIDTH) + "\n";
+          } catch (e) {
+            failed.push(`${p.id} variants.${v.label}.${d}: ${(e as Error).message.split("\n")[0]}`);
+          }
+        }
+      }
       for (const key of ["solutions", "starterSql"] as const) {
         for (const d of Object.keys(p[key] ?? {})) {
           try {
-            p[key][d] = formatSql(p[key][d], d as Dialect, PROBLEM_WIDTH);
+            p[key][d] = fmt(p[key][d], d as Dialect, PROBLEM_WIDTH);
           } catch (e) {
             failed.push(`${p.id} ${key}.${d}: ${(e as Error).message.split("\n")[0]}`);
           }
