@@ -5,8 +5,10 @@
  */
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { ProblemSchema, SchemaDefSchema, type Problem, type SchemaDef } from "../lib/content/types";
+import { ProblemSchema, SchemaDefSchema, type Cell, type Problem, type SchemaDef } from "../lib/content/types";
 import { compareResult, multisetExtraIndexes, resultHash } from "../lib/grading/compare";
+import { combinedHash, scriptTargets } from "../lib/grading/script";
+import type { ProbeOutcome } from "../lib/engine/script";
 import type { QueryResult } from "../lib/engine/types";
 import { createDuckdbNode } from "./duckdb-node";
 import { createMysqlNode } from "./mysql-node";
@@ -30,6 +32,133 @@ const main = async () => {
   const summary: string[] = [];
   let failures = 0;
 
+  type Table = { columns: string[]; rows: Cell[][] };
+  const tables = (outcomes: ProbeOutcome[], what: string): Table[] => {
+    const bad = outcomes.findIndex((o) => o.error !== undefined);
+    if (bad !== -1) throw new Error(`${what} 확인 조회 ${bad + 1} 실패: ${outcomes[bad].error?.split("\n")[0]}`);
+    return outcomes.map((o) => ({ columns: o.result!.columns, rows: o.result!.rows }));
+  };
+
+  /**
+   * 파이프라인 문제: PG 정답 스크립트로 기본·변형별 기대 결과를 만들고 BQ 를 같은 실행기로 비교한다. MySQL 은 다루지 않는다.
+   * raw 를 그 자리에서 고친다. 실패·경고 수를 돌려준다
+   */
+  const buildScript = async (problem: Problem, raw: Record<string, unknown> & { expected?: Record<string, unknown> }, schema: SchemaDef, line: string[]): Promise<number> => {
+    let fails = 0;
+    const warn = (msg: string) => {
+      fails++;
+      line.push(msg);
+    };
+    const script = problem.script!;
+    const solPg = problem.solutions?.postgres;
+    const solBq = problem.solutions?.bigquery;
+    if (!solPg || !solBq) {
+      warn("파이프라인 문제는 solutions.postgres·bigquery 가 모두 필요");
+      return fails;
+    }
+    const runner = { postgres: pg.runScript, bigquery: duck.runScript } as const;
+    const attempt = async <T,>(f: () => Promise<T>): Promise<T | Error> => {
+      try {
+        return await f();
+      } catch (e) {
+        return e instanceof Error ? e : new Error(String(e));
+      }
+    };
+    const short = (e: Error) => e.message.split("\n")[0].slice(0, 160);
+
+    const base = await attempt(() => scriptTargets(runner.postgres, problem, schema, solPg));
+    if (base instanceof Error) {
+      warn(`PG 실패: ${short(base)}`);
+      return fails;
+    }
+    const results = await attempt(async () => tables(base.outcomes, "PG"));
+    if (results instanceof Error) {
+      warn(short(results));
+      return fails;
+    }
+    const prev = raw.expected ?? {};
+    const settings = { ordered: (prev.ordered as boolean) ?? false, tolerance: (prev.tolerance as number) ?? 0.0001, checkColumnNames: (prev.checkColumnNames as boolean) ?? false };
+    const expected = { columns: results[0].columns, rows: results[0].rows, ...settings };
+    line.push(`PG ${results.map((r) => `${r.rows.length}행`).join("+")} 문장 ${base.run.log.length}`);
+    if (results.some((r) => r.rows.length === 0)) warn("경고: 결과 0행");
+
+    const sameAs = (label: string, want: Table[], outcomes: ProbeOutcome[]) => {
+      want.forEach((w, i) => {
+        const o = outcomes[i];
+        if (!o?.result) return warn(`${label} 확인 조회 ${i + 1} 실패: ${o?.error?.split("\n")[0].slice(0, 120)}`);
+        const cmp = compareResult({ ...settings, columns: w.columns, rows: w.rows }, o.result);
+        if (!cmp.pass) warn(`${label} 불일치: ${cmp.mismatches.map((m) => m.message).join(" / ")} 누락예=${JSON.stringify(cmp.missing[0])} 초과예=${JSON.stringify(cmp.extra[0])}`);
+      });
+    };
+    const bq = await attempt(() => scriptTargets(runner.bigquery, problem, schema, solBq));
+    if (bq instanceof Error) warn(`bigquery 실패: ${short(bq)}`);
+    else {
+      const before = fails;
+      sameAs("bigquery", results, bq.outcomes);
+      if (fails === before) line.push("bigquery 일치");
+    }
+    line.push("MySQL 제외");
+
+    const correctHash = combinedHash(base.outcomes);
+    const variants = [];
+    const variantHashes: string[] = [];
+    for (const v of script.variants) {
+      const vr: { results: Table[] } = { results: [] };
+      variants.push({ ...v, ...vr });
+      const hp = v.head.postgres;
+      const hb = v.head.bigquery;
+      if (!hp || !hb) {
+        warn(`변형 "${v.label}" 은 head.postgres·bigquery 가 모두 필요`);
+        variantHashes.push("");
+        continue;
+      }
+      const pv = await attempt(() => scriptTargets(runner.postgres, problem, schema, solPg, hp));
+      const pt = pv instanceof Error ? pv : await attempt(async () => tables(pv.outcomes, `변형 "${v.label}" PG`));
+      if (pv instanceof Error || pt instanceof Error) {
+        warn(`변형 "${v.label}" PG 실패: ${short((pv instanceof Error ? pv : pt) as Error)}`);
+        variantHashes.push("");
+        continue;
+      }
+      variants[variants.length - 1].results = pt;
+      variantHashes.push(combinedHash(pv.outcomes));
+      if (combinedHash(pv.outcomes) === correctHash) warn(`경고: 변형 "${v.label}" 결과가 기본과 같습니다`);
+      const bv = await attempt(() => scriptTargets(runner.bigquery, problem, schema, solBq, hb));
+      if (bv instanceof Error) warn(`변형 "${v.label}" bigquery 실패: ${short(bv)}`);
+      else sameAs(`변형 "${v.label}" bigquery`, pt, bv.outcomes);
+    }
+    if (variants.length) line.push(`변형 ${variants.length}개`);
+
+    const wrongPatterns = [];
+    for (const wp of problem.wrongPatterns) {
+      if (!wp.sql?.postgres) {
+        wrongPatterns.push(wp);
+        continue;
+      }
+      const wsql = wp.sql.postgres;
+      const res = await attempt(() => scriptTargets(runner.postgres, problem, schema, wsql));
+      if (res instanceof Error) {
+        warn(`오답패턴 "${wp.label}" 실행 실패: ${short(res).slice(0, 80)}`);
+        wrongPatterns.push(wp);
+        continue;
+      }
+      const h = combinedHash(res.outcomes);
+      const vh: string[] = [];
+      for (const [i, v] of script.variants.entries()) {
+        const hp = v.head.postgres;
+        const r = hp ? await attempt(() => scriptTargets(runner.postgres, problem, schema, wsql, hp)) : new Error("head 없음");
+        if (r instanceof Error) warn(`오답패턴 "${wp.label}" 변형 "${v.label}" 실행 실패: ${short(r).slice(0, 80)}`);
+        vh[i] = r instanceof Error ? "" : combinedHash(r.outcomes);
+      }
+      if (h === correctHash && vh.every((x, i) => x === variantHashes[i])) warn(`오답패턴 "${wp.label}" 이 정답과 같은 결과(변형 포함)`);
+      wrongPatterns.push({ ...wp, resultHash: h, ...(vh.length ? { variantHashes: vh } : {}) });
+    }
+
+    raw.expected = expected;
+    raw.wrongPatterns = wrongPatterns;
+    raw.script = { ...(raw.script as object), results, tables: base.run.tables, ...(variants.length ? { variants } : {}) };
+    return fails;
+  };
+
   for (const file of listJson(path.join(ROOT, "problems"))) {
     if (filters.length && !filters.some((f) => path.basename(file).startsWith(f))) continue;
     const raw = JSON.parse(readFileSync(file, "utf-8"));
@@ -48,12 +177,19 @@ const main = async () => {
     const run = async (dialect: "postgres" | "bigquery" | "mysql", sql: string): Promise<QueryResult | Error> => {
       try {
         if (dialect === "postgres") return await pg.run(sql);
-        if (dialect === "bigquery") return duck.run(sql);
+        if (dialect === "bigquery") return await duck.run(sql);
         return await mysql!.run(schema, sql);
       } catch (e) {
         return e instanceof Error ? e : new Error(String(e));
       }
     };
+
+    if (problem.script) {
+      failures += await buildScript(problem, raw, schema, line);
+      writeFileSync(file, JSON.stringify(raw, null, 2) + "\n");
+      summary.push(line.join(" | "));
+      continue;
+    }
 
     const pgRes = await run("postgres", problem.solutions.postgres);
     if (pgRes instanceof Error) {

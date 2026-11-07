@@ -62,6 +62,8 @@ export const WrongPatternSchema = z.object({
   explanation: z.string(),
   sql: z.partialRecord(DialectSchema, z.string()).optional(),
   resultHash: z.string().optional(),
+  /** 파이프라인 문제: script.variants 순서대로 머리 구획을 바꿔 돌린 결과 해시. 빌드가 채운다 */
+  variantHashes: z.array(z.string()).optional(),
 });
 export type WrongPattern = z.infer<typeof WrongPatternSchema>;
 
@@ -146,6 +148,35 @@ export const ReviewSchema = z.object({
 });
 export type Review = z.infer<typeof ReviewSchema>;
 
+const ResultTableSchema = z.object({ columns: z.array(z.string()), rows: z.array(z.array(CellSchema)) });
+
+/**
+ * 파이프라인(여러 문장 스크립트) 문제. 있으면 write/fix 문제를 스크립트로 실행·채점한다.
+ * 머리 구획은 '-- A.' 로 시작하는 줄부터 '-- B.' 로 시작하는 첫 줄 앞까지, 본문은 그 줄부터 끝까지다.
+ * 채점은 머리 구획을 solutions 원본으로 바꿔 끼워 돌린다. results·tables·variants[].results 는 빌드가 채운다
+ */
+export const ScriptSchema = z.object({
+  /** 사용자 스크립트 뒤 같은 트랜잭션에서 돌리는 확인 조회(두 방언 공용). 없으면 마지막 조회 문장 결과로 채점 */
+  probes: z.array(z.string()).default([]),
+  /** 머리 구획을 바꿔 다시 돌려 각각 채점한다(본문에 값을 박아 넣으면 틀린다) */
+  variants: z
+    .array(
+      z.object({
+        label: z.string(),
+        head: z.partialRecord(DialectSchema, z.string()),
+        results: z.array(ResultTableSchema).default([]),
+      }),
+    )
+    .default([]),
+  /** 머리 1번 + 본문 2번 실행한 뒤 채점한다(재실행해도 같은 결과여야 하는 적재) */
+  runTwice: z.boolean().default(false),
+  /** 확인 조회별(없으면 마지막 조회 1개) 기본 기대 결과. 비교 설정은 problem.expected 를 쓴다 */
+  results: z.array(ResultTableSchema).default([]),
+  /** 정답 스크립트가 만든 테이블의 행 수(단계별 진단용) */
+  tables: z.record(z.string(), z.number()).default({}),
+});
+export type Script = z.infer<typeof ScriptSchema>;
+
 export const DifficultySchema = z.enum(["basic", "intermediate", "advanced"]);
 export type Difficulty = z.infer<typeof DifficultySchema>;
 export const DIFFICULTY_LABEL: Record<Difficulty, string> = {
@@ -182,6 +213,7 @@ export const ProblemSchema = z.object({
   input: InputTableSchema.optional(),
   spot: SpotSchema.optional(),
   review: ReviewSchema.optional(),
+  script: ScriptSchema.optional(),
   explanation: z.string().default(""),
   dialectNotes: z.partialRecord(DialectSchema, z.string()).optional(),
   choices: z
