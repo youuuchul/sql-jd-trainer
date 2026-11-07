@@ -36,6 +36,28 @@ export const BQ_MACROS = [
   "CREATE OR REPLACE MACRO div(a, b) AS CAST(a AS BIGINT) // CAST(b AS BIGINT)",
 ];
 
+const WEEKDAY = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"];
+
+/**
+ * BigQuery 주 단위의 시작 요일(DuckDB dayofweek, 일요일 0). WEEK 는 일요일 시작, WEEK(요일)은 그 요일, ISOWEEK 는 월요일.
+ * 주 단위가 아니면 null.
+ */
+const weekStart = (u: string): number | null => {
+  const m = u.trim().match(/^(ISOWEEK|WEEK)(?:\(\s*(\w+)\s*\))?$/i);
+  if (!m) return null;
+  if (m[1].toUpperCase() === "ISOWEEK") return 1;
+  if (!m[2]) return 0;
+  const k = WEEKDAY.indexOf(m[2].toUpperCase());
+  return k === -1 ? null : k;
+};
+
+/** DuckDB 'week' 는 월요일 시작이라 그 외 요일은 날짜에서 요일 차이만큼 뺀다 */
+const truncWeek = (x: string, k: number, asDate: boolean): string => {
+  if (k === 1) return `DATE_TRUNC('week', ${x})`;
+  const back = `CAST((dayofweek(${x}) - ${k} + 7) % 7 AS INTEGER)`;
+  return asDate ? `CAST((CAST(${x} AS DATE) - ${back}) AS DATE)` : `(DATE_TRUNC('day', ${x}) - to_days(${back}))`;
+};
+
 export const bqToDuckdb = (input: string): string => {
   let sql = input;
   // 식별자 백틱 -> 큰따옴표. project.dataset.table 형태는 마지막 조각만 남긴다.
@@ -45,11 +67,21 @@ export const bqToDuckdb = (input: string): string => {
   });
   // DATE_TRUNC(d, MONTH) -> DATE_TRUNC('month', d)
   for (const fn of ["DATE_TRUNC", "TIMESTAMP_TRUNC", "DATETIME_TRUNC"]) {
-    sql = rewriteCalls(sql, fn, (a) => (a.length === 2 && UNIT.test(a[1]) ? `DATE_TRUNC(${unitLiteral(a[1])}, ${a[0]})` : `${fn}(${a.join(", ")})`));
+    sql = rewriteCalls(sql, fn, (a) => {
+      if (a.length !== 2) return `${fn}(${a.join(", ")})`;
+      const k = weekStart(a[1]);
+      if (k !== null) return truncWeek(a[0], k, fn === "DATE_TRUNC");
+      return UNIT.test(a[1]) ? `DATE_TRUNC(${unitLiteral(a[1])}, ${a[0]})` : `${fn}(${a.join(", ")})`;
+    });
   }
-  // DATE_DIFF(a, b, DAY) -> DATE_DIFF('day', b, a)
+  // DATE_DIFF(a, b, DAY) -> DATE_DIFF('day', b, a). 주 단위는 두 날짜를 주 시작으로 자른 뒤 일수 / 7
   for (const fn of ["DATE_DIFF", "TIMESTAMP_DIFF", "DATETIME_DIFF"]) {
-    sql = rewriteCalls(sql, fn, (a) => (a.length === 3 ? `DATE_DIFF(${unitLiteral(a[2])}, ${a[1]}, ${a[0]})` : `${fn}(${a.join(", ")})`));
+    sql = rewriteCalls(sql, fn, (a) => {
+      if (a.length !== 3) return `${fn}(${a.join(", ")})`;
+      const k = weekStart(a[2]);
+      if (k !== null) return `(DATE_DIFF('day', ${truncWeek(a[1], k, true)}, ${truncWeek(a[0], k, true)}) // 7)`;
+      return `DATE_DIFF(${unitLiteral(a[2])}, ${a[1]}, ${a[0]})`;
+    });
   }
   // DATE_ADD(d, INTERVAL 7 DAY) -> CAST(d + INTERVAL 7 DAY AS DATE). DuckDB는 DATE + INTERVAL이 TIMESTAMP라 DATE로 되돌린다.
   for (const [fn, op] of [["DATE_ADD", "+"], ["DATE_SUB", "-"]] as const) {

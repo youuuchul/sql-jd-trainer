@@ -64,6 +64,13 @@ const main = async () => {
   duck.load(schema);
   await isolation("PG", pg);
   await isolation("BQ", duck);
+
+  // BigQuery 주 단위: WEEK 는 일요일, WEEK(요일)은 그 요일, ISOWEEK 는 월요일 시작. 2026-11-07 은 토요일
+  const week = await attempt(
+    duck,
+    "SELECT DATE_TRUNC(DATE '2026-11-07', WEEK), DATE_TRUNC(DATE '2026-11-07', WEEK(MONDAY)), DATE_TRUNC(DATE '2026-11-07', ISOWEEK), DATE_TRUNC(DATE '2026-11-07', WEEK(SATURDAY)), DATE_DIFF(DATE '2026-11-08', DATE '2026-10-31', WEEK)",
+  );
+  check("BQ 주 시작 요일과 주 차이", JSON.stringify(week.rows?.[0]) === JSON.stringify(["2026-11-01", "2026-11-02", "2026-11-02", "2026-11-07", 2]), JSON.stringify(week));
   duck.close();
   await pg.close();
   console.log(failures ? `\n실패 ${failures}건` : "\n모두 통과");
