@@ -21,12 +21,12 @@ const decimalToNumber = (raw: unknown, scale: number): number => {
   return neg ? -n : n;
 };
 
-export const arrowToResult = (table: Table, ms: number): QueryResult => {
+export const arrowToResult = (table: Table, ms: number, maxRows = MAX_ROWS): QueryResult => {
   const fields = table.schema.fields;
   const columns = fields.map((f) => f.name);
   const total = table.numRows;
   const rows: Cell[][] = [];
-  const limit = Math.min(total, MAX_ROWS);
+  const limit = Math.min(total, maxRows);
   const vectors = columns.map((_, i) => table.getChildAt(i));
   for (let r = 0; r < limit; r++) {
     const row: Cell[] = [];
@@ -49,5 +49,5 @@ export const arrowToResult = (table: Table, ms: number): QueryResult => {
     }
     rows.push(row);
   }
-  return { columns, rows, ms, truncated: total > MAX_ROWS };
+  return { columns, rows, ms, truncated: total > maxRows };
 };

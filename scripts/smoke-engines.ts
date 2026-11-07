@@ -41,7 +41,7 @@ await pg.close();
 
 const duck = await createDuckdbNode();
 duck.load(schema);
-console.log("BQ", JSON.stringify(duck.run(bqSql)));
+console.log("BQ", JSON.stringify(await duck.run(bqSql)));
 duck.close();
 };
 main().catch((e) => { console.error(e); process.exit(1); });

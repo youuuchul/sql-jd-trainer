@@ -37,7 +37,7 @@ const main = async () => {
   const run = async (dialect: Dialect, sql: string): Promise<QueryResult | Error> => {
     try {
       if (dialect === "postgres") return await pg.run(sql);
-      if (dialect === "bigquery") return duck.run(sql);
+      if (dialect === "bigquery") return await duck.run(sql);
       return await mysql!.run(EMPTY_SCHEMA, sql);
     } catch (e) {
       return e instanceof Error ? e : new Error(String(e));

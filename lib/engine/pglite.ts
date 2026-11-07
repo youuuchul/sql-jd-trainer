@@ -1,8 +1,8 @@
 import type { SchemaDef } from "@/lib/content/types";
 import { schemaDdl } from "./ddl";
-import { toCell } from "./format";
+import { pgRunner, type Runner } from "./runner";
+import { ScriptError, type ScriptOptions, type ScriptRun } from "./script";
 import { MAX_ROWS, QueryError, type Engine, type QueryResult } from "./types";
-import { singleStatement } from "./sql-utils";
 
 type PGliteInstance = import("@electric-sql/pglite").PGlite;
 
@@ -20,6 +20,7 @@ const PARSERS = {
 export class PgliteEngine implements Engine {
   readonly dialect = "postgres" as const;
   private db: PGliteInstance | null = null;
+  private runner: Runner | null = null;
   private loading: Promise<PGliteInstance> | null = null;
   private loadedSchema: string | null = null;
 
@@ -33,6 +34,7 @@ export class PgliteEngine implements Engine {
       this.loading = import("@electric-sql/pglite").then(async ({ PGlite }) => {
         const db = await PGlite.create({ parsers: PARSERS });
         this.db = db;
+        this.runner = pgRunner(db, MAX_ROWS);
         return db;
       });
     }
@@ -47,18 +49,21 @@ export class PgliteEngine implements Engine {
   }
 
   async run(sql: string): Promise<QueryResult> {
-    const db = await this.instance();
-    const stmt = singleStatement(sql);
-    const started = performance.now();
+    await this.instance();
     try {
-      await db.exec("BEGIN READ ONLY");
-      const res = await db.query<unknown[]>(stmt, [], { rowMode: "array" });
-      const rows = res.rows.slice(0, MAX_ROWS).map((r) => r.map((v) => toCell(v)));
-      return { columns: res.fields.map((f) => f.name), rows, ms: Math.round(performance.now() - started), truncated: res.rows.length > MAX_ROWS };
+      return await this.runner!.run(sql);
     } catch (err) {
       throw new QueryError(err instanceof Error ? err.message : String(err), "postgres");
-    } finally {
-      await db.exec("ROLLBACK").catch(() => undefined);
+    }
+  }
+
+  async runScript(sql: string, opts: ScriptOptions): Promise<ScriptRun> {
+    await this.instance();
+    try {
+      return await this.runner!.runScript(sql, opts);
+    } catch (err) {
+      if (err instanceof QueryError) throw err;
+      throw new ScriptError(err instanceof Error ? err.message : String(err), "postgres", []);
     }
   }
 }

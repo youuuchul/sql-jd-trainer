@@ -1,4 +1,5 @@
 import type { Cell, Dialect, SchemaDef } from "@/lib/content/types";
+import type { ScriptOptions, ScriptRun } from "./script";
 
 export interface QueryResult {
   columns: string[];
@@ -21,6 +22,8 @@ export interface Engine {
   /** 스키마 시드 적재. 같은 스키마 id면 다시 적재하지 않는다. */
   load(schema: SchemaDef): Promise<void>;
   run(sql: string): Promise<QueryResult>;
+  /** 여러 문장 스크립트. 파이프라인 문제만 쓴다. MySQL 은 없다 */
+  runScript?(sql: string, opts: ScriptOptions): Promise<ScriptRun>;
 }
 
 export const MAX_ROWS = 500;

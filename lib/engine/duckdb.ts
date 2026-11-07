@@ -1,9 +1,9 @@
 import type { SchemaDef } from "@/lib/content/types";
-import { arrowToResult } from "./arrow";
-import { BQ_MACROS, bqToDuckdb } from "./bq-shim";
+import { BQ_MACROS } from "./bq-shim";
 import { schemaDdl } from "./ddl";
-import { QueryError, type Engine, type QueryResult } from "./types";
-import { singleStatement } from "./sql-utils";
+import { duckRunner, type Runner } from "./runner";
+import { ScriptError, type ScriptOptions, type ScriptRun } from "./script";
+import { MAX_ROWS, QueryError, type Engine, type QueryResult } from "./types";
 
 type AsyncDuckDB = import("@duckdb/duckdb-wasm").AsyncDuckDB;
 type AsyncConnection = import("@duckdb/duckdb-wasm").AsyncDuckDBConnection;
@@ -13,6 +13,7 @@ export class DuckdbEngine implements Engine {
   readonly dialect = "bigquery" as const;
   private db: AsyncDuckDB | null = null;
   private conn: AsyncConnection | null = null;
+  private runner: Runner | null = null;
   private loading: Promise<AsyncConnection> | null = null;
   private loadedSchema: string | null = null;
 
@@ -36,6 +37,7 @@ export class DuckdbEngine implements Engine {
         for (const m of BQ_MACROS) await conn.query(m);
         this.db = db;
         this.conn = conn;
+        this.runner = duckRunner(conn, MAX_ROWS);
         return conn;
       })();
     }
@@ -49,19 +51,23 @@ export class DuckdbEngine implements Engine {
     this.loadedSchema = schema.id;
   }
 
+  /** 쓰기 문장(CREATE·DROP 등)이 연결에 남아 다음 실행·다른 문제에 보이지 않게 실행마다 되돌린다 */
   async run(sql: string): Promise<QueryResult> {
-    const conn = await this.connection();
-    const stmt = bqToDuckdb(singleStatement(sql));
-    const started = performance.now();
+    await this.connection();
     try {
-      // 쓰기 문장(CREATE·DROP 등)이 연결에 남아 다음 실행·다른 문제에 보이지 않게 매번 되돌린다
-      await conn.query("BEGIN");
-      const table = await conn.query(stmt);
-      return arrowToResult(table, Math.round(performance.now() - started));
+      return await this.runner!.run(sql);
     } catch (err) {
       throw new QueryError(err instanceof Error ? err.message : String(err), "bigquery");
-    } finally {
-      await conn.query("ROLLBACK").catch(() => undefined);
+    }
+  }
+
+  async runScript(sql: string, opts: ScriptOptions): Promise<ScriptRun> {
+    await this.connection();
+    try {
+      return await this.runner!.runScript(sql, opts);
+    } catch (err) {
+      if (err instanceof QueryError) throw err;
+      throw new ScriptError(err instanceof Error ? err.message : String(err), "bigquery", []);
     }
   }
 }
