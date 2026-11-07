@@ -192,6 +192,11 @@ const main = async () => {
     duck,
     "SELECT DATE_TRUNC(DATE '2026-11-07', WEEK), DATE_TRUNC(DATE '2026-11-07', WEEK(MONDAY)), DATE_TRUNC(DATE '2026-11-07', ISOWEEK), DATE_TRUNC(DATE '2026-11-07', WEEK(SATURDAY)), DATE_DIFF(DATE '2026-11-08', DATE '2026-10-31', WEEK)",
   );
+  const tzr = await attempt(
+    duck,
+    "SELECT DATE(TIMESTAMP '2026-10-31 16:00:00', 'Asia/Seoul'), DATE(TIMESTAMP '2026-10-31 14:59:59', 'Asia/Seoul'), DATETIME(TIMESTAMP '2026-10-31 16:00:00', 'Asia/Seoul'), TIMESTAMP(DATE '2026-11-01', 'Asia/Seoul'), DATE(TIMESTAMP '2026-10-31 16:00:00', '+09:00'), DATE(TIMESTAMP '2026-10-31 16:00:00')",
+  );
+  check("BQ 시간대 인자(DATE·DATETIME·TIMESTAMP)", JSON.stringify(tzr.rows?.[0]) === JSON.stringify(["2026-11-01", "2026-10-31", "2026-11-01 01:00:00", "2026-10-31 15:00:00", "2026-11-01", "2026-10-31"]), JSON.stringify(tzr));
   check("BQ 주 시작 요일과 주 차이", JSON.stringify(week.rows?.[0]) === JSON.stringify(["2026-11-01", "2026-11-02", "2026-11-02", "2026-11-07", 2]), JSON.stringify(week));
   duck.close();
   await pg.close();

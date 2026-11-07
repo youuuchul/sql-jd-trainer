@@ -58,6 +58,18 @@ const truncWeek = (x: string, k: number, asDate: boolean): string => {
   return asDate ? `CAST((CAST(${x} AS DATE) - ${back}) AS DATE)` : `(DATE_TRUNC('day', ${x}) - to_days(${back}))`;
 };
 
+/** 시간대 인자 → UTC 기준 시차(시간). 시드 시각은 시간대 없는 UTC 값이라 고정 시차로 바꾼다. 모르는 시간대면 null */
+const TZ_HOURS: Record<string, number> = { "asia/seoul": 9, "asia/tokyo": 9, utc: 0, "etc/utc": 0 };
+const tzHours = (arg: string): number | null => {
+  const m = arg.trim().match(/^'([^']+)'$/);
+  if (!m) return null;
+  const name = m[1].trim().toLowerCase();
+  if (name in TZ_HOURS) return TZ_HOURS[name];
+  const off = name.match(/^([+-])(\d{1,2})(?::?00)?$/);
+  return off ? (off[1] === "-" ? -1 : 1) * Number(off[2]) : null;
+};
+const shift = (x: string, h: number) => (h === 0 ? `CAST(${x} AS TIMESTAMP)` : `(CAST(${x} AS TIMESTAMP) ${h > 0 ? "+" : "-"} INTERVAL ${Math.abs(h)} HOUR)`);
+
 export const bqToDuckdb = (input: string): string => {
   let sql = input;
   // 식별자 백틱 -> 큰따옴표. project.dataset.table 형태는 마지막 조각만 남긴다.
@@ -96,9 +108,23 @@ export const bqToDuckdb = (input: string): string => {
     return m ? `CAST(${m[1]} AS DATE)` : `EXTRACT(${a.join(", ")})`;
   });
   // DATE(ts) -> CAST(ts AS DATE), DATE(y, m, d) -> make_date
-  sql = rewriteCalls(sql, "DATE", (a) => (a.length === 1 ? `CAST(${a[0]} AS DATE)` : a.length === 3 ? `make_date(${a.join(", ")})` : `DATE(${a.join(", ")})`));
-  sql = rewriteCalls(sql, "TIMESTAMP", (a) => (a.length === 1 ? `CAST(${a[0]} AS TIMESTAMP)` : `TIMESTAMP(${a.join(", ")})`));
-  sql = rewriteCalls(sql, "DATETIME", (a) => (a.length === 1 ? `CAST(${a[0]} AS TIMESTAMP)` : `DATETIME(${a.join(", ")})`));
+  // DATE(ts, 'Asia/Seoul')·DATETIME(ts, tz) 는 UTC 시각을 그 시간대 현지 값으로, TIMESTAMP(현지 값, tz) 는 현지 값을 UTC 로
+  const tz = (a: string[]) => (a.length === 2 ? tzHours(a[1]) : null);
+  sql = rewriteCalls(sql, "DATE", (a) => {
+    const h = tz(a);
+    if (h !== null) return `CAST(${shift(a[0], h)} AS DATE)`;
+    return a.length === 1 ? `CAST(${a[0]} AS DATE)` : a.length === 3 ? `make_date(${a.join(", ")})` : `DATE(${a.join(", ")})`;
+  });
+  sql = rewriteCalls(sql, "TIMESTAMP", (a) => {
+    const h = tz(a);
+    if (h !== null) return shift(a[0], -h);
+    return a.length === 1 ? `CAST(${a[0]} AS TIMESTAMP)` : `TIMESTAMP(${a.join(", ")})`;
+  });
+  sql = rewriteCalls(sql, "DATETIME", (a) => {
+    const h = tz(a);
+    if (h !== null) return shift(a[0], h);
+    return a.length === 1 ? `CAST(${a[0]} AS TIMESTAMP)` : `DATETIME(${a.join(", ")})`;
+  });
   // SAFE_CAST(x AS INT64) -> TRY_CAST(x AS BIGINT)
   sql = sql.replace(/\bSAFE_CAST\s*\(/gi, "TRY_CAST(");
   // COUNTIF는 BigQuery에서 조건이 전부 NULL이어도 0이다. DuckDB count_if는 NULL을 돌려주므로 보정한다.
