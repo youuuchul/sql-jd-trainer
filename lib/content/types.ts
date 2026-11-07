@@ -231,7 +231,7 @@ export type SetCategory = z.infer<typeof SetCategorySchema>;
 export const SET_CATEGORY_LABEL: Record<SetCategory, string> = {
   basics: "기초 문법",
   job: "직무별 실무",
-  kpi: "대시보드 재현",
+  kpi: "데이터 파이프라인",
   review: "쿼리 리뷰",
   archive: "비공개",
 };
