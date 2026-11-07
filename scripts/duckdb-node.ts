@@ -31,8 +31,17 @@ export const createDuckdbNode = async () => {
     },
     run(sql: string): QueryResult {
       const started = performance.now();
-      const table = conn.query(bqToDuckdb(singleStatement(sql)));
-      return arrowToResult(table, Math.round(performance.now() - started));
+      conn.query("BEGIN");
+      try {
+        const table = conn.query(bqToDuckdb(singleStatement(sql)));
+        return arrowToResult(table, Math.round(performance.now() - started));
+      } finally {
+        try {
+          conn.query("ROLLBACK");
+        } catch {
+          // 사용자 문장이 트랜잭션을 이미 끝낸 경우
+        }
+      }
     },
     close() {
       conn.close();

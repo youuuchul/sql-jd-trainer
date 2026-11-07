@@ -54,10 +54,14 @@ export class DuckdbEngine implements Engine {
     const stmt = bqToDuckdb(singleStatement(sql));
     const started = performance.now();
     try {
+      // 쓰기 문장(CREATE·DROP 등)이 연결에 남아 다음 실행·다른 문제에 보이지 않게 매번 되돌린다
+      await conn.query("BEGIN");
       const table = await conn.query(stmt);
       return arrowToResult(table, Math.round(performance.now() - started));
     } catch (err) {
       throw new QueryError(err instanceof Error ? err.message : String(err), "bigquery");
+    } finally {
+      await conn.query("ROLLBACK").catch(() => undefined);
     }
   }
 }

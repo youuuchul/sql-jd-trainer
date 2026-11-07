@@ -52,6 +52,18 @@ test("문제 풀이 흐름: PostgreSQL 정답·오답 진단·BigQuery·MySQL·�
   await page.getByRole("button", { name: /실행/ }).click();
   await expect(page.getByText("정답", { exact: true })).toBeVisible();
 
+  // BigQuery 쓰기 문장은 실행마다 되돌린다: 시드를 지우고 테이블을 만들어도 다음 실행에 남지 않는다
+  await setEditor(page, "DROP TABLE customers");
+  await page.getByRole("button", { name: /실행/ }).click();
+  await setEditor(page, "CREATE TABLE leak_check AS SELECT 1 AS x");
+  await page.getByRole("button", { name: /실행/ }).click();
+  await setEditor(page, "SELECT * FROM leak_check");
+  await page.getByRole("button", { name: /실행/ }).click();
+  await expect(page.locator("pre", { hasText: /leak_check/ })).toBeVisible();
+  await setEditor(page, p.solutions!.bigquery!);
+  await page.getByRole("button", { name: /실행/ }).click();
+  await expect(page.getByText("정답", { exact: true })).toBeVisible();
+
   // MySQL (원격 Route Handler). 화면에서는 고를 수 없어 브라우저 엔진이 부르는 경로를 직접 부른다
   await expect(page.getByRole("radio", { name: "MySQL" })).toHaveCount(0);
   const mysql = (sql: string) => page.request.post("/api/engine/mysql", { data: { schemaId: p.schema, sql } });

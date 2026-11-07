@@ -17,9 +17,16 @@ export const createPgliteNode = async () => {
       loaded = schema.id;
     },
     async run(sql: string): Promise<QueryResult> {
+      const stmt = singleStatement(sql);
       const started = performance.now();
-      const res = await db.query<unknown[]>(singleStatement(sql), [], { rowMode: "array" });
-      return { columns: res.fields.map((f) => f.name), rows: res.rows.map((r) => r.map((v) => toCell(v))), ms: Math.round(performance.now() - started), truncated: false };
+      // 브라우저 엔진과 같게 읽기 전용으로 돌리고 되돌린다
+      await db.exec("BEGIN READ ONLY");
+      try {
+        const res = await db.query<unknown[]>(stmt, [], { rowMode: "array" });
+        return { columns: res.fields.map((f) => f.name), rows: res.rows.map((r) => r.map((v) => toCell(v))), ms: Math.round(performance.now() - started), truncated: false };
+      } finally {
+        await db.exec("ROLLBACK").catch(() => undefined);
+      }
     },
     close: () => db.close(),
   };
