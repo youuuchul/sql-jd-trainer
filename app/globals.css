@@ -390,4 +390,30 @@ samp,
     line-height: 1.55;
     font-weight: 550;
   }
+
+  /* 결과 표 스크롤 영역: 오버레이 스크롤바가 숨지 않게 두께를 정해 항상 보인다 */
+  .hq-scroll::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+  }
+  .hq-scroll::-webkit-scrollbar-track {
+    background: var(--color-surface-2);
+  }
+  .hq-scroll::-webkit-scrollbar-thumb {
+    background: var(--color-faint);
+    border: 3px solid var(--color-surface-2);
+    border-radius: 999px;
+  }
+  .hq-scroll::-webkit-scrollbar-thumb:hover {
+    background: var(--color-muted);
+  }
+  .hq-scroll::-webkit-scrollbar-corner {
+    background: var(--color-surface-2);
+  }
+  @supports not selector(::-webkit-scrollbar) {
+    .hq-scroll {
+      scrollbar-width: thin;
+      scrollbar-color: var(--color-faint) var(--color-surface-2);
+    }
+  }
 }

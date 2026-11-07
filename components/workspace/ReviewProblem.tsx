@@ -396,7 +396,7 @@ export function ReviewProblem({ problem, schema, dialect, onDialectChange, statu
   if (desktop)
     return (
       <>
-        <section className="flex min-h-0 min-w-0 flex-col overflow-y-auto">{mid}</section>
+        <section className="flex min-h-0 min-w-0 flex-col overflow-y-auto [&>*]:shrink-0">{mid}</section>
         <aside className={`${PANE} p-[18px]`}>{aside}</aside>
       </>
     );

@@ -22,7 +22,7 @@ export function ResultGrid({ columns, rows, caption, highlight, truncated, empty
   const selectable = Boolean(onToggle);
   if (!columns.length) return <p className="px-4 py-6 text-sm text-muted">{emptyMessage}</p>;
   return (
-    <div className="overflow-auto">
+    <div className="hq-scroll max-h-[min(26rem,60dvh)] overflow-auto">
       <table className="w-max min-w-full border-collapse font-mono text-[12.5px] leading-[1.2] [font-feature-settings:'tnum'_1]">
         <caption className="sr-only">{caption}</caption>
         <thead className="sticky top-0 bg-surface">
