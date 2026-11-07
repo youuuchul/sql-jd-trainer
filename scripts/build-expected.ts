@@ -8,6 +8,7 @@ import path from "node:path";
 import { ProblemSchema, SchemaDefSchema, type Cell, type Problem, type SchemaDef } from "../lib/content/types";
 import { compareResult, multisetExtraIndexes, resultHash } from "../lib/grading/compare";
 import { combinedHash, scriptTargets } from "../lib/grading/script";
+import { checkScriptProblem } from "../lib/grading/script-check";
 import type { ProbeOutcome } from "../lib/engine/script";
 import type { QueryResult } from "../lib/engine/types";
 import { createDuckdbNode } from "./duckdb-node";
@@ -156,6 +157,7 @@ const main = async () => {
     raw.expected = expected;
     raw.wrongPatterns = wrongPatterns;
     raw.script = { ...(raw.script as object), results, tables: base.run.tables, ...(variants.length ? { variants } : {}) };
+    for (const msg of checkScriptProblem(ProblemSchema.parse(raw), schema)) warn(`게시 검사: ${msg}`);
     return fails;
   };
 

@@ -10,7 +10,8 @@ import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { loadEnvConfig } from "@next/env";
 import { neon } from "@neondatabase/serverless";
-import { CardDeckSchema, DIALECTS, ProblemSchema, ProblemSetSchema, SchemaDefSchema, SyntaxRefSchema } from "../lib/content/types";
+import { CardDeckSchema, DIALECTS, ProblemSchema, ProblemSetSchema, SchemaDefSchema, SyntaxRefSchema, type SchemaDef } from "../lib/content/types";
+import { checkScriptProblem } from "../lib/grading/script-check";
 
 loadEnvConfig(process.cwd(), true);
 
@@ -24,9 +25,11 @@ type Row = { kind: "schema" | "problem" | "set" | "deck" | "syntax"; id: string;
 const collect = (): Row[] => {
   const rows: Row[] = [];
   const schemaIds = new Set<string>();
+  const schemas = new Map<string, SchemaDef>();
   for (const file of listJson(path.join(ROOT, "schemas"))) {
     const s = SchemaDefSchema.parse(readJson(file));
     schemaIds.add(s.id);
+    schemas.set(s.id, s);
     rows.push({ kind: "schema", id: s.id, body: s });
   }
   const problemIds = new Set<string>();
@@ -34,6 +37,10 @@ const collect = (): Row[] => {
     const p = ProblemSchema.parse(readJson(file));
     if (!schemaIds.has(p.schema)) throw new Error(`${file}: unknown schema ${p.schema}`);
     if (p.format !== "mcq" && !p.expected?.rows.length) throw new Error(`${file}: expected 결과가 없습니다. build-expected 를 먼저 실행하세요.`);
+    if (p.script) {
+      const problems = checkScriptProblem(p, schemas.get(p.schema)!);
+      if (problems.length) throw new Error(`${file}: ${problems.join(" / ")}`);
+    }
     if (p.format === "predict" && !p.input?.rows.length) throw new Error(`${file}: predict 문제는 input 표가 필요합니다.`);
     if (p.format === "spot" && !p.spot?.anomalyRows.length) throw new Error(`${file}: spot 문제는 spot.anomalyRows 가 필요합니다.`);
     if (p.format === "review") {
