@@ -155,7 +155,7 @@ test("깨진 쿼리 고치기: 시작 쿼리가 채워지고 수정하면 정답
 });
 
 test("파이프라인: 여러 문장 스크립트 정답·실행 기록·오답 진단·확인 조회 테이블 없음·BigQuery, 미리 쓴 줄 표시", async ({ page }) => {
-  const p = problems().find((x) => x.script?.probes.length && x.starterSql?.postgres && x.wrongPatterns.some((w) => w.sql?.postgres));
+  const p = problems().find((x) => x.script?.probes?.length && x.starterSql?.postgres && x.wrongPatterns.some((w) => w.sql?.postgres));
   test.skip(!p, "로컬 content 에 확인 조회가 있는 파이프라인 문제가 없습니다");
   const sol = p!.solutions!.postgres!;
   const table = Object.keys(p!.script!.tables).find((t) => p!.script!.probes[0].includes(t))!;
@@ -196,7 +196,7 @@ test("파이프라인: 여러 문장 스크립트 정답·실행 기록·오답 
 });
 
 test("파이프라인: 머리 변수를 바꿔 실험해도 원본 변수로 채점, 본문에 값을 박으면 변형 기준 오답", async ({ page }) => {
-  const p = problems().find((x) => x.script?.variants.length && /DATE '\d{4}-\d{2}-\d{2}' AS \w+/.test(x.solutions?.postgres ?? ""));
+  const p = problems().find((x) => x.script?.variants?.length && /DATE '\d{4}-\d{2}-\d{2}' AS \w+/.test(x.solutions?.postgres ?? ""));
   test.skip(!p, "로컬 content 에 변형이 있는 파이프라인 문제가 없습니다");
   const sol = p!.solutions!.postgres!;
   const cut = sol.indexOf("-- B.");
