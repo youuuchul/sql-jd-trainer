@@ -74,6 +74,15 @@ content/jd/competencies.json    공고 분석용 역량 사전 (keywords -> prob
 
 게시 전 화면 확인은 `CONTENT_SOURCE=local npx next dev -p 3100` 으로 한다. 개발 모드에서만 DB 대신 로컬 `content/` 를 읽고(운영·Preview 빌드는 항상 DB), 파일을 고친 뒤에는 dev 서버를 다시 띄운다. 새 문제 형식·분류를 쓰는 콘텐츠는 그 코드가 운영에 배포된 뒤에 게시한다. 운영 코드가 모르는 값이 DB 에 들어가면 콘텐츠 로드가 실패한다.
 
+파이프라인 문제(`script` 필드, 분류 kpi)는 여러 문장 스크립트를 PostgreSQL·BigQuery 로만 실행한다(MySQL 없음).
+
+- 머리 구획: `-- A.` 로 시작하는 줄부터 `-- B.` 로 시작하는 첫 줄 앞까지. 채점은 이 구획을 `solutions` 원본으로 바꿔 끼워 돌린다
+- `script.probes`: 스크립트 뒤 같은 트랜잭션에서 돌리는 확인 조회(두 방언 공용). 없으면 마지막 조회 문장으로 채점
+- `script.variants`: 머리 구획 대체본. 각각 다시 돌려 채점한다(본문에 값을 박으면 틀린다)
+- `script.runTwice`: 머리 1번 + 본문 2번 실행 뒤 채점(재실행 안전 적재)
+- 허용 문장: SELECT·WITH·VALUES·CREATE [OR REPLACE] [TEMP] TABLE·INSERT·DELETE·UPDATE·DROP TABLE·TRUNCATE, BigQuery 는 DECLARE·SET(값 치환). 트랜잭션 제어 등은 거부. BigQuery 변수 이름은 스키마 컬럼과 겹치면 안 된다
+- 실행이 끝나면 모든 변경을 되돌린다. 실행기·채점 확인: `npx tsx scripts/check-engine.ts`
+
 정답 쿼리를 바꾸거나 문제를 추가하면 기대 결과를 다시 만든다. 세 방언의 결과가 같은지, 오답 패턴이 정답과 구분되는지 함께 검사한다.
 
 ```bash
