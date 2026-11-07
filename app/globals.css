@@ -257,58 +257,132 @@ samp,
     }
   }
 
-  /* 진행 경로 노드 */
+  /* 진행 경로 노드: 가로로 넓적한 동전. --nd 아래 두께, --ndc 두께 색, ::after 왼쪽 위 사선 광택, cur::before 바깥 링 */
   .hq-node {
     --ns: 64px;
-    width: var(--ns);
+    --nd: max(5px, calc(var(--ns) * 0.14));
+    --ndc: var(--color-line-2);
+    width: calc(var(--ns) * 1.15);
     height: var(--ns);
     border-radius: 50%;
     display: grid;
     place-items: center;
     position: relative;
     flex: none;
+    background: var(--color-surface-3);
+    color: var(--color-faint);
+    box-shadow: 0 var(--nd) 0 var(--ndc);
+    -webkit-tap-highlight-color: transparent;
+    transition: transform 80ms ease-out, box-shadow 80ms ease-out;
+  }
+  .hq-node::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: linear-gradient(128deg, transparent 0 15%, rgb(255 255 255 / 0.3) 15% 29%, transparent 29% 34%, rgb(255 255 255 / 0.16) 34% 40%, transparent 40%);
+    pointer-events: none;
+  }
+  .hq-node > :not(.hq-bubble) {
+    position: relative;
+    z-index: 1;
   }
   .hq-node.done,
   .hq-node.cur {
+    --ndc: color-mix(in srgb, var(--cat) 68%, #000);
+    --glyph-cut: var(--cat);
     background: var(--cat);
     color: #fff;
-    box-shadow: 0 5px 0 color-mix(in srgb, var(--cat) 66%, #000);
+  }
+  .hq-node.todo,
+  .hq-node.lock {
+    --glyph-cut: var(--color-surface-3);
+  }
+  .hq-node.todo::after,
+  .hq-node.lock::after {
+    opacity: 0.55;
   }
   .hq-node.cur::before {
     content: "";
     position: absolute;
-    inset: -9px;
+    inset: -10px -10px calc(-10px - var(--nd));
     border-radius: 50%;
-    box-shadow: inset 0 0 0 4px color-mix(in srgb, var(--cat) 28%, transparent);
+    box-shadow: inset 0 0 0 7px color-mix(in srgb, var(--cat) 26%, var(--color-bg));
     pointer-events: none;
   }
-  .hq-node.todo {
-    background: var(--color-surface);
-    color: color-mix(in srgb, var(--cat) 80%, #000);
-    box-shadow:
-      inset 0 0 0 2px var(--color-line-2),
-      0 5px 0 var(--color-line-2);
-  }
-  .hq-node.lock {
-    background: var(--color-surface-3);
-    color: var(--color-faint);
-    box-shadow: 0 5px 0 var(--color-line-2);
+  a.hq-node:active {
+    transform: translateY(calc(var(--nd) - 2px));
+    box-shadow: 0 2px 0 var(--ndc);
   }
   @media (prefers-color-scheme: dark) {
-    .hq-node.todo {
-      background: var(--color-surface-2);
-      color: var(--cat);
-      box-shadow:
-        inset 0 0 0 1px var(--color-line-2),
-        0 4px 0 var(--color-lip);
+    .hq-node {
+      --ndc: color-mix(in srgb, var(--color-surface-3) 58%, #000);
     }
-    .hq-node.lock {
-      box-shadow: 0 4px 0 var(--color-lip);
+    .hq-node.done,
+    .hq-node.cur {
+      --ndc: color-mix(in srgb, var(--cat) 50%, #000);
+    }
+    .hq-node::after {
+      background: linear-gradient(128deg, transparent 0 15%, rgb(255 255 255 / 0.22) 15% 29%, transparent 29% 34%, rgb(255 255 255 / 0.11) 34% 40%, transparent 40%);
+    }
+    .hq-node.todo::after,
+    .hq-node.lock::after {
+      opacity: 0.35;
+    }
+    .hq-node.cur::before {
+      box-shadow: inset 0 0 0 7px color-mix(in srgb, var(--cat) 30%, var(--color-bg));
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .hq-node {
+      transition: none;
     }
   }
   .hq-node:focus-visible {
-    outline: 2px solid var(--color-accent);
-    outline-offset: 12px;
+    outline: 2.5px solid var(--color-accent);
+    outline-offset: 14px;
+  }
+  /* cur 노드 위 말풍선(이어서·시작) */
+  .hq-bubble {
+    position: absolute;
+    bottom: calc(100% + 18px);
+    left: 50%;
+    translate: -50% 0;
+    z-index: 2;
+    padding: 6px 11px 7px;
+    border-radius: 11px;
+    background: var(--color-surface);
+    color: color-mix(in srgb, var(--cat) 84%, #000);
+    font-size: 13.5px;
+    font-weight: 800;
+    line-height: 1.1;
+    white-space: nowrap;
+    box-shadow:
+      inset 0 0 0 2px var(--color-line-2),
+      0 2px 0 var(--color-line-2);
+    pointer-events: none;
+  }
+  .hq-bubble::after {
+    content: "";
+    position: absolute;
+    top: calc(100% - 5px);
+    left: 50%;
+    width: 10px;
+    height: 10px;
+    translate: -50% 0;
+    rotate: 45deg;
+    background: var(--color-surface);
+    box-shadow: 2px 2px 0 var(--color-line-2);
+    border-bottom-right-radius: 2px;
+  }
+  @media (prefers-color-scheme: dark) {
+    .hq-bubble {
+      color: var(--cat);
+      box-shadow: inset 0 0 0 1.5px var(--color-line-2);
+    }
+    .hq-bubble::after {
+      box-shadow: 1.5px 1.5px 0 var(--color-line-2);
+    }
   }
   /* 진행 링 */
   .hq-ring {
