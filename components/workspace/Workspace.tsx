@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { CodeBlock, Explanation } from "@/components/practice/Explanation";
 import { SolveTopDesktop, SolveTopMobile, type SetNav } from "@/components/practice/SolveHeader";
 import { UTabs, type UTabItem } from "@/components/practice/UTabs";
@@ -41,6 +41,8 @@ interface RunState {
   diagnoses?: Diagnosis[];
 }
 
+const subscribeNever = () => () => {};
+
 type MobileTab = "problem" | "editor" | "result" | "schema";
 
 export function Workspace({ problem, schema, mode = "practice", nav, onGraded, footer }: WorkspaceProps) {
@@ -56,13 +58,41 @@ export function Workspace({ problem, schema, mode = "practice", nav, onGraded, f
   const { status, run: execute } = useEngine(dialect, schema);
   const desktop = useDesktop();
 
+  // 하이드레이션 중에는 저장소(localStorage)·방언이 서버 값이라, 끝난 뒤에 저장된 쿼리를 불러온다.
+  const hydrated = useSyncExternalStore(subscribeNever, () => true, () => false);
   // 방언이나 문제가 바뀌면 저장된 쿼리 또는 시작 쿼리를 불러온다 (렌더 중 상태 조정 패턴).
-  const editorKey = `${problem.id}:${dialect}`;
-  if (loadedKey !== editorKey) {
+  const editorKey = hydrated ? `${problem.id}:${dialect}` : "";
+  if (hydrated && loadedKey !== editorKey) {
     setLoadedKey(editorKey);
     setSql(progress.sql[dialect] ?? problem.starterSql?.[dialect] ?? "");
     setRun({});
   }
+
+  // 작성 중인 쿼리를 방언별로 저장한다(새로고침 후 복원). 모의 시험은 실행·방언 전환 때만 저장한다.
+  const savedSql = progress.sql[dialect];
+  const baseline = savedSql ?? problem.starterSql?.[dialect] ?? "";
+  const dirty = mode === "practice" && hydrated && loadedKey === editorKey && sql !== baseline;
+  const pending = useRef({ sql, dialect, dirty });
+  useEffect(() => {
+    pending.current = { sql, dialect, dirty };
+  });
+  useEffect(() => {
+    if (!dirty) return;
+    const t = setTimeout(() => update((p) => ({ sql: { ...p.sql, [dialect]: sql } })), 500);
+    return () => clearTimeout(t);
+  }, [dirty, sql, dialect, update]);
+  // 디바운스 대기 중에 화면을 떠나거나 새로고침해도 마지막 입력을 남긴다
+  useEffect(() => {
+    const flush = () => {
+      const { sql: s, dialect: d, dirty: d2 } = pending.current;
+      if (d2) update((p) => ({ sql: { ...p.sql, [d]: s } }));
+    };
+    window.addEventListener("pagehide", flush);
+    return () => {
+      window.removeEventListener("pagehide", flush);
+      flush();
+    };
+  }, [update]);
 
   const changeDialect = (d: Dialect) => {
     update((p) => ({ sql: { ...p.sql, [dialect]: sql } }));
@@ -242,17 +272,17 @@ export function Workspace({ problem, schema, mode = "practice", nav, onGraded, f
     const header = mode === "practice" ? <SolveTopDesktop nav={nav} /> : null;
     const mid =
       problem.format === "mcq" ? (
-        <section className="flex min-h-0 min-w-0 flex-col gap-3 overflow-y-auto">
+        <section className="flex min-h-0 min-w-0 flex-col gap-3 overflow-y-auto [&>*]:shrink-0">
           <McqProblem problem={problem} onGraded={onGraded} />
           {footer}
         </section>
       ) : problem.format === "review" ? null : special ? (
-        <section className="flex min-h-0 min-w-0 flex-col gap-3 overflow-y-auto">
+        <section className="flex min-h-0 min-w-0 flex-col gap-3 overflow-y-auto [&>*]:shrink-0">
           {special}
           {footer}
         </section>
       ) : (
-        <section className="flex min-h-0 min-w-0 flex-col gap-3 overflow-y-auto">
+        <section className="flex min-h-0 min-w-0 flex-col gap-3 overflow-y-auto [&>*]:shrink-0">
           {toolbar}
           {editor}
           {results}

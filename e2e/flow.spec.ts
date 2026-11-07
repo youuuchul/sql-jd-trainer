@@ -74,6 +74,62 @@ test("문제 풀이 흐름: PostgreSQL 정답·오답 진단·BigQuery·MySQL·�
   await expect(row.getByText("통과")).toBeVisible();
 });
 
+test("작성 중인 쿼리: 실행하지 않아도 방언별로 저장돼 새로고침 후 남는다", async ({ page }) => {
+  const p = problem("ba-01-where-in-compare");
+  await page.goto(`/problems/${p.id}`);
+  await waitReady(page);
+  await setEditor(page, "SELECT 1 AS draft_pg");
+  await page.waitForTimeout(900);
+  await page.reload();
+  await expect(page.locator(".cm-content")).toContainText("draft_pg");
+  // 새로고침 직후 다시 새로고침해도 빈 값으로 덮이지 않는다
+  await page.reload();
+  await expect(page.locator(".cm-content")).toContainText("draft_pg");
+
+  await page.getByRole("radio", { name: "BigQuery" }).click({ force: true });
+  await waitReady(page);
+  await setEditor(page, "SELECT 2 AS draft_bq");
+  // 디바운스가 끝나기 전에 새로고침해도 마지막 입력이 남는다
+  await page.reload();
+  await expect(page.getByRole("radio", { name: "BigQuery" })).toBeChecked();
+  await expect(page.locator(".cm-content")).toContainText("draft_bq");
+  await page.getByRole("radio", { name: "PostgreSQL" }).click({ force: true });
+  await expect(page.locator(".cm-content")).toContainText("draft_pg");
+});
+
+test("결과 표: 넓고 긴 결과가 표 영역 안에서 가로·세로로 스크롤되고, 정답일 때도 내 결과 표와 기대 결과가 보인다", async ({ page }) => {
+  const p = problem("k-02-gmv-aov-monthly");
+  await page.goto(`/problems/${p.id}`);
+  await waitReady(page);
+  await setEditor(page, "SELECT * FROM dim_member ORDER BY 1 LIMIT 40");
+  await page.getByRole("button", { name: /실행/ }).click();
+  await expect(page.getByText(/내 결과 40행/).first()).toBeVisible();
+
+  const scroller = page.locator("table").first().locator("xpath=ancestor::div[contains(@class,'hq-scroll')][1]");
+  const dims = await scroller.evaluate((el) => ({ ch: el.clientHeight, sh: el.scrollHeight, cw: el.clientWidth, sw: el.scrollWidth, oy: getComputedStyle(el).overflowY, ox: getComputedStyle(el).overflowX }));
+  expect(dims.sh).toBeGreaterThan(dims.ch);
+  expect(dims.sw).toBeGreaterThan(dims.cw);
+  expect(dims.ch).toBeLessThanOrEqual(26 * 16);
+  const box = (await scroller.boundingBox())!;
+  await page.mouse.move(box.x + 80, box.y + 90);
+  await page.mouse.wheel(0, 300);
+  await expect.poll(() => scroller.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
+  await page.mouse.wheel(250, 0);
+  await expect.poll(() => scroller.evaluate((el) => el.scrollLeft)).toBeGreaterThan(0);
+  // 오버레이 스크롤바가 숨지 않도록 스크롤바 두께가 지정돼 있다(헤드리스는 스크롤바를 그리지 않아 스타일 값으로 확인)
+  expect(await scroller.evaluate((el) => getComputedStyle(el, "::-webkit-scrollbar").height)).toBe("12px");
+
+  // 정답: 표 + 기대 결과 토글 유지
+  await setEditor(page, p.solutions!.postgres!);
+  await page.getByRole("button", { name: /실행/ }).click();
+  await expect(page.getByText("정답", { exact: true })).toBeVisible();
+  await expect(page.getByRole("tab", { name: /^내 결과/ })).toBeVisible();
+  await expect(page.locator("table").first()).toBeVisible();
+  expect(await page.locator("table").first().evaluate((el) => el.getBoundingClientRect().height)).toBeGreaterThan(60);
+  await page.getByRole("tab", { name: /^기대 결과/ }).click();
+  await expect(page.getByRole("table", { name: "기대 결과" })).toBeVisible();
+});
+
 test("깨진 쿼리 고치기: 시작 쿼리가 채워지고 수정하면 정답", async ({ page }) => {
   const p = problem("ba-15-fix-not-equal-null");
   await page.goto(`/problems/${p.id}`);
