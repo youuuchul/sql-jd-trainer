@@ -61,7 +61,7 @@ function CategoryChip({ cat, on, onSelect }: { cat: CategoryPath; on: boolean; o
     <button type="button" onClick={onSelect} aria-pressed={on} className={`${base} ${CAT_CLASS[cat.category]} ${on ? "hq-catfill shadow-none!" : "bg-surface-2 text-fg-2"}`}>
       {!on && <i aria-hidden="true" className="size-2 rounded-full bg-[var(--cat)]" />}
       <b className="font-extrabold tracking-[-0.02em]">{SET_CATEGORY_LABEL[cat.category]}</b>
-      <span className={`font-mono text-[12px] font-bold tabular-nums ${on ? "opacity-80" : "text-muted"}`}>
+      <span className={`font-mono text-[12px] font-bold tabular-nums ${on ? "opacity-85" : "text-muted"}`}>
         {cat.passed}/{cat.total}
       </span>
     </button>
@@ -80,7 +80,7 @@ function SetUnit({ sp, index, bubble }: { sp: SetPath; index: number; bubble: st
       <div className="sticky top-[env(safe-area-inset-top)] z-20 -mx-1 bg-bg px-1 pt-2 pb-1">
         <div className={`hq-catfill flex min-h-[78px] items-center gap-3 rounded-[18px] py-3 pr-3 pl-4`}>
           <div className="min-w-0 flex-1">
-            <p className="text-[12.5px] font-bold tracking-[0.01em] opacity-80">
+            <p className="text-[12.5px] font-bold tracking-[0.01em] opacity-85">
               {kicker} · <span className="font-mono tabular-nums">{sp.passed}/{sp.total}</span>
             </p>
             <h2 id={`set-${set.id}`} className="mt-0.5 text-[21px] leading-tight font-extrabold tracking-[-0.03em] [word-break:keep-all]">
