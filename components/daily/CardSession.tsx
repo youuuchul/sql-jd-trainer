@@ -46,6 +46,8 @@ interface Finish {
   prevBox: number;
 }
 
+const KIND_LABEL = { function: "함수 이해", context: "맥락 이해" } as const;
+
 const DIALECT_TONE: Record<string, string> = {
   postgres: "text-dialect-pg",
   bigquery: "text-dialect-bq",
@@ -214,6 +216,7 @@ export function CardSession({ queue: initial, syntax, dialectFilter, onAnswer, o
         <div className="mx-0.5 flex h-[26px] items-center gap-2 text-[13px] font-semibold text-muted">
           <span className="truncate">{card.deckTitle}</span>
           <span className={`shrink-0 ${DIALECT_TONE[card.dialect]}`}>{card.dialect === "common" ? "공통" : DIALECT_LABEL[card.dialect]}</span>
+          {card.kind && <span className="shrink-0">{KIND_LABEL[card.kind]}</span>}
           {card.level === "applied" && <span className="shrink-0">응용</span>}
           <span className="ml-auto shrink-0">{chip}</span>
         </div>
@@ -230,11 +233,15 @@ export function CardSession({ queue: initial, syntax, dialectFilter, onAnswer, o
               {hintStep === 2 && (
                 <>
                   <p className={canFirstLetter ? "mt-1.5" : ""}>{card.hint}</p>
-                  {refs.map((ref) => (
-                    <p key={ref.id} className="mt-1.5 text-[13px] leading-snug">
-                      <b>{maskAnswers(ref.title, card.answers)}</b> {maskAnswers(ref.summary, card.answers)}
-                    </p>
-                  ))}
+                  {card.hintMore ? (
+                    <p className="mt-1.5">{card.hintMore}</p>
+                  ) : (
+                    refs.map((ref) => (
+                      <p key={ref.id} className="mt-1.5 text-[13px] leading-snug">
+                        <b>{maskAnswers(ref.title, card.answers)}</b> {maskAnswers(ref.summary, card.answers)}
+                      </p>
+                    ))
+                  )}
                 </>
               )}
             </div>
