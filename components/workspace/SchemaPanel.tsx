@@ -5,6 +5,7 @@ import { Icon } from "@/components/ui/icons";
 import { UTabs, type UTabItem } from "@/components/practice/UTabs";
 import type { SchemaDef, SeedTable } from "@/lib/content/types";
 import { ResultGrid } from "./ResultGrid";
+import { RuleText, identifierSet } from "./RuleText";
 
 function TableCard({ table }: { table: SeedTable }) {
   const [open, setOpen] = useState(false);
@@ -55,6 +56,7 @@ function TableCard({ table }: { table: SeedTable }) {
  */
 export function SchemaPanel({ schema, focusText = "" }: { schema: SchemaDef; focusText?: string }) {
   const haystack = focusText.toLowerCase();
+  const names = identifierSet(schema);
   const items: UTabItem[] = [
     ...(schema.notes.length
       ? [
@@ -64,8 +66,8 @@ export function SchemaPanel({ schema, focusText = "" }: { schema: SchemaDef; foc
             content: (
               <ul className="space-y-2">
                 {schema.notes.map((n, i) => (
-                  <li key={i} className="rounded-[14px] bg-surface-2 px-3.5 py-3 text-[12.5px] leading-[1.55] font-medium text-fg-2">
-                    {n}
+                  <li key={i} className="rounded-[14px] bg-surface-2 px-3.5 py-3 text-[12.5px] leading-[1.6] font-medium text-fg-2">
+                    <RuleText text={n} names={names} lead />
                   </li>
                 ))}
               </ul>
@@ -85,7 +87,9 @@ export function SchemaPanel({ schema, focusText = "" }: { schema: SchemaDef; foc
                   return (
                     <li key={m.name} className={`rounded-[14px] px-3.5 py-3 ${hot ? "bg-note-bg shadow-[inset_3px_0_0_var(--color-cat-kpi)]" : "bg-surface-2"}`}>
                       <p className="text-sm font-extrabold">{m.name}</p>
-                      <p className={`mt-[3px] text-[12.5px] leading-[1.55] font-medium ${hot ? "text-note-ink" : "text-muted"}`}>{m.definition}</p>
+                      <div className={`mt-[3px] text-[12.5px] leading-[1.6] font-medium ${hot ? "text-note-ink" : "text-muted"}`}>
+                        <RuleText text={m.definition} names={names} />
+                      </div>
                     </li>
                   );
                 })}
