@@ -8,7 +8,10 @@ import { Chip } from "@/components/ui/Chip";
 import { Icon } from "@/components/ui/icons";
 import { DIALECT_LABEL, type Dialect, type Problem, type SchemaDef } from "@/lib/content/types";
 import { QueryError, type QueryResult } from "@/lib/engine";
+import { ScriptError, type StatementLog } from "@/lib/engine/script";
+import { MAX_ROWS } from "@/lib/engine/types";
 import { compareResult, diagnose, type CompareResult, type Diagnosis } from "@/lib/grading";
+import { gradeScript } from "@/lib/grading/script";
 import { useDialect, useProblemProgress } from "@/lib/progress";
 import { DialectSelector, EngineStatusLabel } from "./DialectSelector";
 import { GradeBanner } from "./GradeBanner";
@@ -39,6 +42,43 @@ interface RunState {
   error?: string;
   cmp?: CompareResult;
   diagnoses?: Diagnosis[];
+  /** 파이프라인 문제: 문장별 실행 기록과 추가 결과 */
+  script?: {
+    log: StatementLog[];
+    /** 두 번째부터의 확인 조회 결과 */
+    probes: QueryResult[];
+    /** 확인 조회가 있을 때 스크립트 마지막 조회 결과 */
+    last: QueryResult | null;
+    /** 기본 검사가 아닌 곳(변형·두 번 실행)에서 틀렸으면 그 이름 */
+    failedAt: string | null;
+    headSwapped: boolean;
+  };
+}
+
+const KIND_LABEL: Record<StatementLog["kind"], string> = {
+  SELECT: "SELECT",
+  "CREATE TABLE": "CREATE TABLE",
+  INSERT: "INSERT",
+  DELETE: "DELETE",
+  UPDATE: "UPDATE",
+  "DROP TABLE": "DROP TABLE",
+  TRUNCATE: "TRUNCATE",
+  DECLARE: "DECLARE",
+  SET: "SET",
+};
+
+/** 표시용으로 행 수를 자른다(채점은 전체 행으로 이미 끝났다) */
+const forDisplay = (r: QueryResult): QueryResult => (r.rows.length > MAX_ROWS ? { ...r, rows: r.rows.slice(0, MAX_ROWS), truncated: true } : r);
+
+function StatementLogGrid({ log }: { log: StatementLog[] }) {
+  return (
+    <ResultGrid
+      columns={["줄", "문장", "대상", "행 수"]}
+      rows={log.map((l) => [l.line, KIND_LABEL[l.kind], l.table ?? "", l.rows ?? ""])}
+      caption="문장별 실행 기록"
+      emptyMessage="실행한 문장이 없습니다."
+    />
+  );
 }
 
 const subscribeNever = () => () => {};
@@ -55,7 +95,7 @@ export function Workspace({ problem, schema, mode = "practice", nav, onGraded, f
   const [revealed, setRevealed] = useState(false);
   const [resultTab, setResultTab] = useState("result");
   const [tab, setTab] = useState<MobileTab>("problem");
-  const { status, run: execute } = useEngine(dialect, schema);
+  const { status, run: execute, runScript } = useEngine(dialect, schema);
   const desktop = useDesktop();
 
   // 하이드레이션 중에는 저장소(localStorage)·방언이 서버 값이라, 끝난 뒤에 저장된 쿼리를 불러온다.
@@ -103,6 +143,33 @@ export function Workspace({ problem, schema, mode = "practice", nav, onGraded, f
     if (!sql.trim() || running) return;
     setRunning(true);
     update((p) => ({ sql: { ...p.sql, [dialect]: sql } }));
+    if (problem.script) {
+      try {
+        const g = await gradeScript(runScript, problem, dialect, schema, sql);
+        const probes = g.view.probes.map((o) => (o.result ? forDisplay(o.result) : null));
+        const shown = problem.script.probes.length ? probes[0] : g.view.last;
+        const script = {
+          log: g.view.log,
+          probes: probes.slice(1).filter((r): r is QueryResult => r !== null),
+          last: problem.script.probes.length ? g.view.last : null,
+          failedAt: g.failedAt,
+          headSwapped: g.headSwapped,
+        };
+        setRun({ result: shown ? { ...shown, ms: g.view.ms } : { columns: [], rows: [], ms: g.view.ms, truncated: false }, cmp: g.cmp, diagnoses: g.diagnoses, script });
+        setResultTab("result");
+        update((p) => ({ attempts: p.attempts + 1, passed: p.passed || g.pass, passedAt: g.pass && !p.passed ? new Date().toISOString() : p.passedAt }));
+        onGraded?.(g.pass);
+      } catch (err) {
+        setRun({
+          error: err instanceof Error ? err.message : String(err),
+          ...(err instanceof ScriptError && err.log.length ? { script: { log: err.log, probes: [], last: null, failedAt: null, headSwapped: false } } : {}),
+        });
+      } finally {
+        setRunning(false);
+        setTab("result");
+      }
+      return;
+    }
     try {
       const result = await execute(sql);
       const expected = problem.expected;
@@ -120,11 +187,12 @@ export function Workspace({ problem, schema, mode = "practice", nav, onGraded, f
       setRunning(false);
       setTab("result");
     }
-  }, [sql, running, execute, problem, dialect, update, onGraded]);
+  }, [sql, running, execute, runScript, problem, schema, dialect, update, onGraded]);
 
   const highlight = useMemo(() => {
     const map = new Map<number, "extra" | "missing">();
-    if (!run.cmp || !run.result) return map;
+    // 변형·두 번 실행에서 틀렸거나 머리를 바꿔 실험한 결과는 기본 기대 결과와 행 단위로 맞대지 않는다
+    if (!run.cmp || !run.result || run.script?.failedAt || run.script?.headSwapped) return map;
     const extraKeys = new Set(run.cmp.extra.map((r) => JSON.stringify(r)));
     run.result.rows.forEach((r, i) => {
       if (extraKeys.has(JSON.stringify(r))) map.set(i, "extra");
@@ -162,12 +230,12 @@ export function Workspace({ problem, schema, mode = "practice", nav, onGraded, f
 
   const editor = (
     <div className={`${CODE_BOX} ${desktop ? "h-[min(22rem,44vh)] min-h-[13rem] shrink-0" : "h-[min(55dvh,26rem)] min-h-[15rem]"}`}>
-      <SqlEditor value={sql} onChange={setSql} dialect={dialect} onRun={onRun} schema={schema} />
+      <SqlEditor value={sql} onChange={setSql} dialect={dialect} onRun={onRun} schema={schema} prewritten={problem.script ? problem.starterSql?.[dialect] : undefined} />
     </div>
   );
 
   const missing =
-    run.cmp && !run.cmp.pass && run.cmp.missing.length > 0 ? (
+    run.cmp && !run.cmp.pass && run.cmp.missing.length > 0 && !run.script?.failedAt && !run.script?.headSwapped ? (
       <div>
         <p className={`pb-1.5 text-[12.5px] font-semibold text-muted ${desktop ? "px-4 pt-3" : "px-1 pt-3.5"}`}>기대 결과에는 있는데 내 결과에 없는 행 {run.cmp.missing.length}개</p>
         <div className={desktop ? "" : "overflow-hidden rounded-[14px] bg-surface ring-1 ring-line ring-inset"}>
@@ -176,17 +244,23 @@ export function Workspace({ problem, schema, mode = "practice", nav, onGraded, f
       </div>
     ) : null;
 
+  const box = (node: React.ReactNode) => <div className={desktop ? "" : "overflow-hidden rounded-[14px] bg-surface ring-1 ring-line ring-inset"}>{node}</div>;
+  const scriptItems: UTabItem[] = run.script
+    ? [
+        ...run.script.probes.map((r, i) => ({ value: `probe-${i + 2}`, label: `확인 조회 ${i + 2} ${r.rows.length}행`, content: box(<ResultGrid columns={r.columns} rows={r.rows} caption={`확인 조회 ${i + 2}`} truncated={r.truncated} />) })),
+        ...(run.script.last ? [{ value: "last", label: `마지막 조회 ${run.script.last.rows.length}행`, content: box(<ResultGrid columns={run.script.last.columns} rows={run.script.last.rows} caption="마지막 조회 결과" truncated={run.script.last.truncated} />) }] : []),
+      ]
+    : [];
+  const logItem: UTabItem[] = run.script ? [{ value: "log", label: `실행 기록 ${run.script.log.length}문장`, content: box(<StatementLogGrid log={run.script.log} />) }] : [];
+
   const resultItems: UTabItem[] = run.result
     ? [
         {
           value: "result",
           label: `내 결과 ${run.result.rows.length}행`,
-          content: (
-            <div className={desktop ? "" : "overflow-hidden rounded-[14px] bg-surface ring-1 ring-line ring-inset"}>
-              <ResultGrid columns={run.result.columns} rows={run.result.rows} caption="쿼리 결과" highlight={highlight} truncated={run.result.truncated} />
-            </div>
-          ),
+          content: box(<ResultGrid columns={run.result.columns} rows={run.result.rows} caption="쿼리 결과" highlight={highlight} truncated={run.result.truncated} />),
         },
+        ...scriptItems,
         ...(problem.expected && mode === "practice"
           ? [
               {
@@ -200,13 +274,16 @@ export function Workspace({ problem, schema, mode = "practice", nav, onGraded, f
               },
             ]
           : []),
+        ...logItem,
       ]
     : [];
 
   const results = (
     <>
       {run.error && <pre className={ERROR_BOX}>{run.error}</pre>}
-      {run.cmp && run.result && <GradeBanner cmp={run.cmp} diagnoses={run.diagnoses ?? []} ms={run.result.ms} />}
+      {run.error && run.script && <div className="overflow-hidden rounded-[14px] bg-surface ring-1 ring-line ring-inset"><StatementLogGrid log={run.script.log} /></div>}
+      {run.cmp && run.result && <GradeBanner cmp={run.cmp} diagnoses={run.diagnoses ?? []} ms={run.result.ms} scope={run.script?.failedAt ?? undefined} />}
+      {run.script?.headSwapped && <p className="px-1 text-[12.5px] font-medium text-muted">채점은 문제의 변수 설정으로 다시 실행한 결과입니다.</p>}
       {run.result &&
         (desktop ? (
           <div className="overflow-hidden rounded-[18px] bg-surface pt-1 ring-1 ring-line ring-inset">

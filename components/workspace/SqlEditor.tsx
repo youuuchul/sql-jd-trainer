@@ -3,6 +3,8 @@ import CodeMirror, { EditorView, keymap, Prec, type Extension } from "@uiw/react
 import type { Completion, CompletionContext, CompletionResult } from "@codemirror/autocomplete";
 import { MySQL, PostgreSQL, StandardSQL, sql, type SQLNamespace } from "@codemirror/lang-sql";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
+import { RangeSetBuilder } from "@codemirror/state";
+import { Decoration, ViewPlugin, type DecorationSet, type ViewUpdate } from "@codemirror/view";
 import { tags as t } from "@lezer/highlight";
 import { useMemo } from "react";
 import type { Dialect, SchemaDef } from "@/lib/content/types";
@@ -27,6 +29,8 @@ const theme = EditorView.theme(
     ".cm-completionMatchedText": { textDecoration: "none", fontWeight: "700", color: "var(--color-accent-ink)" },
     ".cm-completionInfo": { backgroundColor: "var(--color-surface)", color: "var(--color-fg-2)", border: "1px solid var(--color-line-2)" },
     ".cm-matchingBracket": { backgroundColor: "color-mix(in srgb, var(--color-accent) 25%, transparent)", outline: "none" },
+    ".cm-prewritten": { backgroundColor: "color-mix(in srgb, var(--color-fg) 4.5%, transparent)" },
+    ".cm-writespot": { boxShadow: "inset 3px 0 0 var(--color-accent)" },
   },
   { dark: true },
 );
@@ -72,6 +76,40 @@ const columnSource = (schema: SchemaDef) => {
   };
 };
 
+const PREWRITTEN = Decoration.line({ class: "cm-prewritten" });
+const WRITESPOT = Decoration.line({ class: "cm-writespot" });
+
+/** 미리 써 준 줄은 옅은 배경, 작성 자리([작성] 표시 줄)와 새로 쓴 줄은 왼쪽 강조선. 편집은 막지 않는다 */
+const prewrittenLines = (starter: string): Extension => {
+  const given = new Set(starter.split("\n").map((l) => l.trim()).filter(Boolean));
+  const build = (view: EditorView): DecorationSet => {
+    const b = new RangeSetBuilder<Decoration>();
+    let last = 0;
+    for (const { from, to } of view.visibleRanges) {
+      for (let pos = from; pos <= to; ) {
+        const line = view.state.doc.lineAt(pos);
+        const t = line.text.trim();
+        if (line.number > last && t) b.add(line.from, line.from, t.includes("[작성]") || !given.has(t) ? WRITESPOT : PREWRITTEN);
+        last = line.number;
+        pos = line.to + 1;
+      }
+    }
+    return b.finish();
+  };
+  return ViewPlugin.fromClass(
+    class {
+      decorations: DecorationSet;
+      constructor(view: EditorView) {
+        this.decorations = build(view);
+      }
+      update(u: ViewUpdate) {
+        if (u.docChanged || u.viewportChanged) this.decorations = build(u.view);
+      }
+    },
+    { decorations: (v) => v.decorations },
+  );
+};
+
 export interface SqlEditorProps {
   value: string;
   onChange: (v: string) => void;
@@ -80,9 +118,11 @@ export interface SqlEditorProps {
   readOnly?: boolean;
   /** 주면 테이블·컬럼을 자동완성한다 */
   schema?: SchemaDef;
+  /** 미리 써 준 시작 쿼리. 주면 미리 쓴 줄과 작성 자리를 구분해 표시한다 */
+  prewritten?: string;
 }
 
-export function SqlEditor({ value, onChange, dialect, onRun, readOnly = false, schema }: SqlEditorProps) {
+export function SqlEditor({ value, onChange, dialect, onRun, readOnly = false, schema, prewritten }: SqlEditorProps) {
   const extensions = useMemo<Extension[]>(() => {
     const lang = sql({ dialect: DIALECT_MAP[dialect], upperCaseKeywords: true, schema: schema ? toNamespace(schema) : undefined });
     return [
@@ -92,8 +132,9 @@ export function SqlEditor({ value, onChange, dialect, onRun, readOnly = false, s
       syntaxHighlighting(highlight),
       Prec.highest(keymap.of([{ key: "Mod-Enter", run: () => (onRun?.(), true) }])),
       EditorView.lineWrapping,
+      ...(prewritten ? [prewrittenLines(prewritten)] : []),
     ];
-  }, [dialect, onRun, schema]);
+  }, [dialect, onRun, schema, prewritten]);
   return (
     <CodeMirror
       value={value}

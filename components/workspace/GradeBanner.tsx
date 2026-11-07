@@ -7,7 +7,8 @@ export function CauseLabel({ children }: { children: React.ReactNode }) {
   return <span className="inline-flex h-6 shrink-0 items-center rounded-[7px] bg-note px-[9px] text-[12.5px] font-bold whitespace-nowrap text-[#3e3000]">{children}</span>;
 }
 
-export function GradeBanner({ cmp, diagnoses, ms }: { cmp: CompareResult; diagnoses: Diagnosis[]; ms: number }) {
+/** scope: 기본 검사가 아닌 곳(변수 바꿔 실행·두 번 실행)에서 틀렸을 때 그 검사 이름 */
+export function GradeBanner({ cmp, diagnoses, ms, scope }: { cmp: CompareResult; diagnoses: Diagnosis[]; ms: number; scope?: string }) {
   if (cmp.pass) {
     return (
       <div className="rounded-2xl bg-pass-soft px-4 py-3.5 ring-[1.5px] ring-pass/30 ring-inset">
@@ -25,6 +26,7 @@ export function GradeBanner({ cmp, diagnoses, ms }: { cmp: CompareResult; diagno
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-fg-2">
         <Icon name="xcircle" size={20} className="text-fail" />
         <b className="text-[15px] font-extrabold text-fail-ink">오답</b>
+        {scope && <span className="text-[12.5px] font-bold text-fail-ink">{scope} 기준</span>}
         <span className="font-mono text-[12.5px]">
           기대 {cmp.expectedRows}행 · 결과 {cmp.actualRows}행{ms > 0 && ` · ${ms}ms`}
         </span>

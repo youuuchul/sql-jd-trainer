@@ -114,6 +114,7 @@ export const gradeScript = async (run: ScriptRunFn, problem: Problem, dialect: D
   const view = await run(sql, opts);
   const expected = baseExpected(problem);
   const fail = (failedAt: string | null, cmp: CompareResult, diagnoses: Diagnosis[], headSwapped: boolean): ScriptGrade => ({ view, pass: false, cmp, failedAt, diagnoses, headSwapped });
+  if (!expected.length) return fail(null, failCmp("기대 결과가 없어 채점할 수 없습니다.", 0), [], false);
 
   const origHead = splitHead(problem.solutions?.[dialect] ?? "");
   const userHead = splitHead(sql);

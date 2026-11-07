@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { Dialect, SchemaDef } from "@/lib/content/types";
 import { getEngine, QueryError, type QueryResult } from "@/lib/engine";
+import type { ScriptOptions, ScriptRun } from "@/lib/engine/script";
 
 export type EngineStatus = { state: "loading" | "ready" | "error"; message?: string };
 
@@ -43,5 +44,15 @@ export const useEngine = (dialect: Dialect, schema: SchemaDef) => {
     [dialect, schema],
   );
 
-  return { status, run };
+  const runScript = useCallback(
+    async (sql: string, opts: ScriptOptions): Promise<ScriptRun> => {
+      const engine = await getEngine(dialect);
+      await engine.load(schema);
+      if (!engine.runScript) throw new QueryError("이 방언에서는 여러 문장을 실행할 수 없습니다.", dialect);
+      return engine.runScript(sql, opts);
+    },
+    [dialect, schema],
+  );
+
+  return { status, run, runScript };
 };
