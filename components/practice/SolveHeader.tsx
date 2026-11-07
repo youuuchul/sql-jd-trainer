@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/icons";
 import type { SetCategory } from "@/lib/content/types";
 import { useProgressStore } from "@/lib/progress";
+import { splitSetTitle } from "./setTitle";
 
 /** 문제 풀이 화면이 속한 세트 정보. 풀이 헤더의 위치·이전·다음에 쓴다 */
 export interface SetNav {
@@ -16,11 +17,14 @@ export interface SetNav {
   index: number;
 }
 
+/** 뒤로 버튼의 접근성 이름은 실제 목적지를 따른다 */
+const backLabel = (href: string) => (href.startsWith("/sets/") ? "세트로 돌아가기" : href.startsWith("/practice") ? "연습으로 돌아가기" : href.startsWith("/jd") ? "공고로 돌아가기" : "돌아가기");
+
 export function BackButton({ href }: { href: string }) {
   return (
     <Link
       href={href}
-      aria-label="세트로 돌아가기"
+      aria-label={backLabel(href)}
       className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-surface text-fg-2 shadow-[inset_0_0_0_1.5px_var(--color-line-2),0_2px_0_var(--color-line-2)] focus-visible:outline-2 focus-visible:outline-accent dark:shadow-[inset_0_0_0_1px_var(--color-line-2)]"
     >
       <Icon name="back" size={21} />
@@ -65,7 +69,7 @@ export function SolveTopDesktop({ nav }: { nav?: SetNav }) {
       {nav && (
         <>
           <span className="hq-catink text-sm font-bold">
-            {nav.setTitle.startsWith(CAT_SHORT[nav.category]) ? nav.setTitle : `${CAT_SHORT[nav.category]} · ${nav.setTitle}`}
+            {CAT_SHORT[nav.category]} · {splitSetTitle(nav.setTitle, nav.category).name}
           </span>
           <span className="ml-1.5 flex gap-1.5" aria-hidden="true">
             {nav.items.map((it, i) => {

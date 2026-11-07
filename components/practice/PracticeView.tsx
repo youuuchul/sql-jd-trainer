@@ -5,6 +5,7 @@ import { CAT_CLASS, CAT_SHORT } from "@/components/ui/category";
 import { Button } from "@/components/ui/Button";
 import { FORMAT_ICON, Icon } from "@/components/ui/icons";
 import { PathNode } from "@/components/ui/PathNode";
+import { splitSetTitle } from "./setTitle";
 import { DIFFICULTY_LABEL, FORMAT_LABEL, SET_CATEGORY_LABEL, type SetCategory } from "@/lib/content/types";
 import { usePath, type CategoryPath, type PathNode as PathNodeData, type PathSet, type SetPath } from "@/lib/path";
 
@@ -76,7 +77,7 @@ function SetUnit({ sp, number, open, onToggle }: { sp: SetPath; number: number; 
         <span className="block text-xs font-bold opacity-80">
           {CAT_SHORT[set.category]} {number}
         </span>
-        <h2 className="pr-16 text-[21px] leading-tight font-extrabold tracking-[-0.03em]">{set.title.replace(/^\S+ \d+\.\s*/, "")}</h2>
+        <h2 className="pr-16 text-[21px] leading-tight font-extrabold tracking-[-0.03em]">{splitSetTitle(set.title, set.category).name}</h2>
         <span className="mt-[3px] block truncate pr-14 text-[12.5px] font-medium opacity-80">{set.description}</span>
         <span className="absolute top-4 right-4 rounded-[9px] bg-white/20 px-2 py-1.5 font-mono text-sm font-extrabold dark:bg-surface-3">
           {sp.passed}/{sp.total}
@@ -90,7 +91,10 @@ function SetUnit({ sp, number, open, onToggle }: { sp: SetPath; number: number; 
                 <div className="relative translate-x-[var(--x)] lg:translate-x-0">
                   <PathNode state={n.state} category={set.category} icon={FORMAT_ICON[n.problem.format]} size={68} href={`/problems/${n.problem.id}`} label={n.problem.title} />
                   {n.state === "cur" && (
-                    <div className="absolute top-1/2 left-[calc(100%+16px)] z-10 w-max max-w-[190px] -translate-y-1/2 rounded-[14px] bg-surface px-3 pt-2.5 pb-[11px] shadow-[inset_0_0_0_1.5px_var(--color-line-2),0_3px_0_var(--color-line-2)] lg:hidden dark:shadow-[inset_0_0_0_1px_var(--color-line-2),0_8px_24px_-8px_#000]">
+                    <div
+                      style={{ maxWidth: Math.min(190, 125 + Math.abs(WAVE[i % WAVE.length])) }}
+                      className={`absolute top-1/2 z-10 w-max -translate-y-1/2 rounded-[14px] ${WAVE[i % WAVE.length] > 0 ? "right-[calc(100%+16px)]" : "left-[calc(100%+16px)]"} bg-surface px-3 pt-2.5 pb-[11px] shadow-[inset_0_0_0_1.5px_var(--color-line-2),0_3px_0_var(--color-line-2)] lg:hidden dark:shadow-[inset_0_0_0_1px_var(--color-line-2),0_8px_24px_-8px_#000]`}
+                    >
                       <b className="block text-sm leading-[1.35] font-bold">{n.problem.title}</b>
                       <span className="mt-[3px] block text-xs font-semibold text-muted">{nodeMeta(n)}</span>
                     </div>

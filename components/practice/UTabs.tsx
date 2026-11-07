@@ -36,6 +36,7 @@ export function UTabs({ items, value, defaultValue, onChange, label, size = "md"
   const [inner, setInner] = useState(defaultValue ?? items[0]?.value);
   const shown = items.filter((t) => !t.hidden);
   const current = value ?? inner;
+  const hasCurrent = shown.some((t) => t.value === current);
   const refs = useRef<(HTMLButtonElement | null)[]>([]);
 
   const select = (v: string) => {
@@ -81,7 +82,7 @@ export function UTabs({ items, value, defaultValue, onChange, label, size = "md"
             role="tab"
             aria-selected={selected}
             aria-controls={`${id}-panel-${t.value}`}
-            tabIndex={selected ? 0 : -1}
+            tabIndex={selected || (!hasCurrent && i === 0) ? 0 : -1}
             onClick={() => select(t.value)}
             className={
               seg
@@ -108,7 +109,12 @@ export function UTabs({ items, value, defaultValue, onChange, label, size = "md"
         list
       )}
       {items.map((t) => (
-        <div key={t.value} id={`${id}-panel-${t.value}`} role="tabpanel" aria-labelledby={`${id}-tab-${t.value}`} hidden={t.value !== current} className={panelClassName}>
+        <div
+          key={t.value}
+          id={`${id}-panel-${t.value}`}
+          role="tabpanel"
+          {...(t.hidden ? { "aria-label": typeof t.label === "string" ? t.label : undefined } : { "aria-labelledby": `${id}-tab-${t.value}` })}
+          hidden={t.value !== current} className={panelClassName}>
           {t.content}
         </div>
       ))}
