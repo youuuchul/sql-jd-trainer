@@ -154,6 +154,75 @@ test("깨진 쿼리 고치기: 시작 쿼리가 채워지고 수정하면 정답
   await expect(page.getByText("정답", { exact: true })).toBeVisible();
 });
 
+test("파이프라인: 여러 문장 스크립트 정답·실행 기록·오답 진단·확인 조회 테이블 없음·BigQuery, 미리 쓴 줄 표시", async ({ page }) => {
+  const p = problems().find((x) => x.script?.probes.length && x.starterSql?.postgres && x.wrongPatterns.some((w) => w.sql?.postgres));
+  test.skip(!p, "로컬 content 에 확인 조회가 있는 파이프라인 문제가 없습니다");
+  const sol = p!.solutions!.postgres!;
+  const table = Object.keys(p!.script!.tables).find((t) => p!.script!.probes[0].includes(t))!;
+  await page.goto(`/problems/${p!.id}`);
+  await waitReady(page);
+  // 시작 쿼리의 미리 쓴 줄과 작성 자리 표시
+  await expect(page.locator(".cm-prewritten").first()).toBeVisible();
+  await expect(page.locator(".cm-writespot").first()).toBeVisible();
+
+  await setEditor(page, sol);
+  await page.getByRole("button", { name: /실행/ }).click();
+  await expect(page.getByText("정답", { exact: true })).toBeVisible();
+  await expect(page.getByText(new RegExp(`내 결과 ${p!.script!.results[0].rows.length}행`))).toBeVisible();
+  await page.getByRole("tab", { name: /^실행 기록 \d+문장/ }).click();
+  await expect(page.getByRole("table", { name: "문장별 실행 기록" }).getByText("CREATE TABLE").first()).toBeVisible();
+
+  const wp = p!.wrongPatterns.find((w) => w.sql?.postgres)!;
+  await setEditor(page, wp.sql!.postgres!);
+  await page.getByRole("button", { name: /실행/ }).click();
+  await expect(page.getByText("오답", { exact: true })).toBeVisible();
+  await expect(page.getByText(wp.label).first()).toBeVisible();
+
+  // 확인 조회가 읽는 테이블 이름을 바꾸면 진단
+  await setEditor(page, sol.replaceAll(table, `${table}_x`));
+  await page.getByRole("button", { name: /실행/ }).click();
+  await expect(page.getByText("확인 조회 테이블 없음")).toBeVisible();
+
+  // 트랜잭션 제어 문장은 거부
+  await setEditor(page, `${sol}\n;\nCOMMIT`);
+  await page.getByRole("button", { name: /실행/ }).click();
+  await expect(page.locator("pre", { hasText: /트랜잭션 제어 문장은 쓸 수 없습니다/ })).toBeVisible();
+
+  await page.getByRole("radio", { name: "BigQuery" }).click();
+  await waitReady(page);
+  await setEditor(page, p!.solutions!.bigquery!);
+  await page.getByRole("button", { name: /실행/ }).click();
+  await expect(page.getByText("정답", { exact: true })).toBeVisible();
+});
+
+test("파이프라인: 머리 변수를 바꿔 실험해도 원본 변수로 채점, 본문에 값을 박으면 변형 기준 오답", async ({ page }) => {
+  const p = problems().find((x) => x.script?.variants.length && /DATE '\d{4}-\d{2}-\d{2}' AS \w+/.test(x.solutions?.postgres ?? ""));
+  test.skip(!p, "로컬 content 에 변형이 있는 파이프라인 문제가 없습니다");
+  const sol = p!.solutions!.postgres!;
+  const cut = sol.indexOf("-- B.");
+  const [head, body] = [sol.slice(0, cut), sol.slice(cut)];
+  const vars = [...head.matchAll(/DATE '(\d{4}-\d{2})-(\d{2})' AS (\w+)/g)];
+  await page.goto(`/problems/${p!.id}`);
+  await waitReady(page);
+
+  // 머리의 첫 날짜를 하루 옮겨 실험해도 채점은 원본 머리로
+  const [whole, ym, dd] = vars[0];
+  const moved = whole.replace(`${ym}-${dd}`, `${ym}-${dd === "01" ? "02" : "01"}`);
+  await setEditor(page, head.replace(whole, moved) + body);
+  await page.getByRole("button", { name: /실행/ }).click();
+  await expect(page.getByText("정답", { exact: true })).toBeVisible();
+  await expect(page.getByText("채점은 문제의 변수 설정으로 다시 실행한 결과입니다.")).toBeVisible();
+
+  // 본문의 p.변수 자리에 날짜를 직접 쓰면 변형(다른 기간)에서 틀린다
+  let hard = body;
+  for (const [, y, d, name] of vars) hard = hard.replaceAll(`p.${name}`, `DATE '${y}-${d}'`);
+  test.skip(hard === body, "본문이 p.변수 형태로 변수를 읽지 않습니다");
+  await setEditor(page, head + hard);
+  await page.getByRole("button", { name: /실행/ }).click();
+  await expect(page.getByText("오답", { exact: true })).toBeVisible();
+  await expect(page.getByText(/ 기준$/).first()).toBeVisible();
+});
+
 test("객관식 문제 채점", async ({ page }) => {
   const p = problem("ba-04-date-between-boundary");
   await page.goto(`/problems/${p.id}`);
