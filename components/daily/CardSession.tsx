@@ -81,7 +81,6 @@ export function CardSession({ queue: initial, syntax, dialectFilter, onAnswer, o
   const [lastWrong, setLastWrong] = useState<{ text: string; near: number | null } | null>(null);
   const [finish, setFinish] = useState<Finish | null>(null);
   const [results, setResults] = useState<SessionResult[]>([]);
-  const [retried, setRetried] = useState<Set<string>>(new Set());
   const states = useRef(new Map<string, CardState | undefined>());
   const inputRef = useRef<HTMLInputElement>(null);
   const actionRef = useRef<HTMLSpanElement>(null);
@@ -103,18 +102,19 @@ export function CardSession({ queue: initial, syntax, dialectFilter, onAnswer, o
 
   const complete = (outcome: Outcome, gaveUp: boolean) => {
     if (finish) return;
-    const prev = states.current.has(card.id) ? states.current.get(card.id) : card.prev;
-    const after = schedule(prev, outcome, Date.now());
-    states.current.set(card.id, after);
     const firstTry = !results.some((r) => r.cardId === card.id);
-    setFinish({ outcome, gaveUp, box: after.box, prevBox: prev?.box ?? -1 });
+    const prev = states.current.has(card.id) ? states.current.get(card.id) : card.prev;
+    // 같은 세션 안 반복은 복습 일정을 바꾸지 않는다. 처음 결과(틀렸으면 5분 뒤)를 그대로 보인다
+    const after = firstTry || !prev ? schedule(prev, outcome, Date.now()) : prev;
+    if (firstTry) states.current.set(card.id, after);
+    setFinish({ outcome, gaveUp, box: after.box, prevBox: firstTry ? (prev?.box ?? -1) : after.box });
     setMarked(false);
-    onAnswer(card, outcome, firstTry);
-    if (firstTry) setResults((r) => [...r, { cardId: card.id, outcome }]);
-    if (outcome === "wrong" && !retried.has(card.id)) {
-      setRetried((r) => new Set(r).add(card.id));
-      setQueue((q) => [...q, card]);
+    if (firstTry) {
+      onAnswer(card, outcome, true);
+      setResults((r) => [...r, { cardId: card.id, outcome }]);
     }
+    // 정답 보기로 끝난 카드는 직접 입력해 맞힐 때까지 세션 뒤에 다시 붙는다
+    if (gaveUp) setQueue((q) => [...q, card]);
   };
 
   const submit = () => {
@@ -130,15 +130,15 @@ export function CardSession({ queue: initial, syntax, dialectFilter, onAnswer, o
     inputRef.current?.focus();
   };
 
-  /** 오답을 낸 카드에서 나가면 정답 보기와 같이 wrong 으로 남긴다. 오답이 없었으면 기록하지 않는다 */
+  /** 처음 푸는 카드에서 오답을 내고 나가면 정답 보기와 같이 wrong 으로 남긴다. 오답이 없었거나 반복 중인 카드면 기록하지 않는다 */
   const leave = () => {
-    if (finish || wrongCount === 0) {
+    const firstTry = !results.some((r) => r.cardId === card.id);
+    if (finish || wrongCount === 0 || !firstTry) {
       onExit(results);
       return;
     }
-    const firstTry = !results.some((r) => r.cardId === card.id);
-    onAnswer(card, "wrong", firstTry);
-    onExit(firstTry ? [...results, { cardId: card.id, outcome: "wrong" }] : results);
+    onAnswer(card, "wrong", true);
+    onExit([...results, { cardId: card.id, outcome: "wrong" }]);
   };
 
   const next = () => {

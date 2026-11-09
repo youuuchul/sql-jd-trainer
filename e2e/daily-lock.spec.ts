@@ -147,11 +147,20 @@ test.describe("하루 카드 (모바일)", () => {
     // 새 카드는 자주 쓰는 카드 위주: 5장 중 응용은 1장 이하
     expect(shown.filter((c) => c.level === "applied").length).toBeLessThanOrEqual(1);
 
-    // 6번째: 틀렸던 카드가 다시 나온다
+    // 6번째: 정답 보기로 넘긴 카드가 다시 나온다. 또 정답 보기로 넘기면 또 나온다(직접 맞힐 때까지)
     expect((await shownCard(page)).id).toBe(first.id);
     await expect(page.getByText("다시", { exact: true })).toBeVisible();
+    await openHints(page, first);
+    await page.getByRole("button", { name: "정답 보기" }).click();
+    await expect(page.getByText("5분 뒤 다시 나옵니다")).toBeVisible();
+    await page.getByRole("button", { name: "계속" }).click();
+    // 7번째: 같은 카드를 직접 입력해 맞히면 세션이 끝난다. 반복에서 맞혀도 복습 일정은 처음 결과(5분 뒤) 그대로
+    expect((await shownCard(page)).id).toBe(first.id);
     await page.getByLabel("빈칸").fill(first.answers[0]);
     await page.getByLabel("빈칸").press("Enter");
+    await expect(page.getByText("정답", { exact: true })).toBeVisible();
+    await expect(page.getByText("5분 뒤 복습").first()).toBeVisible();
+    expect(await storedCard(page, first.id)).toMatchObject({ box: 0, lapses: 1, reps: 1 });
     await page.getByRole("button", { name: "결과 보기" }).click();
 
     // 목표를 채운 뒤 연속 일수 화면: 푼 카드 5(정답 3, 힌트 정답 1, 오답 1)
