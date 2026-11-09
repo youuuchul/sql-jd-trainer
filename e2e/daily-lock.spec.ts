@@ -224,21 +224,48 @@ test.describe("하루 카드 (모바일)", () => {
     expect(await storedCard(page, a.id)).toMatchObject({ box: 0, lapses: 1 });
   });
 
-  test("오답을 낸 뒤 맞혀도 기록은 틀린 카드(5분 뒤 복습)이고, 하루 풀이 수에는 한 장으로 센다", async ({ page }) => {
+  test("오답을 낸 뒤 맞혀도 기록은 틀린 카드(5분 뒤 복습)이고, 하루 풀이 수에는 한 장으로 세며, 세션 뒤에 틀리지 않고 맞힐 때까지 다시 나온다", async ({ page }) => {
     await page.goto("/");
     await page.addStyleTag({ content: "nextjs-portal { display: none !important; }" });
     await page.getByRole("button", { name: "시작하기" }).click();
     const card = await shownCard(page);
-    await page.getByLabel("빈칸").fill("zzz_wrong");
-    await page.getByLabel("빈칸").press("Enter");
-    await expect(page.locator("article").getByRole("alert")).toBeVisible();
-    await page.getByLabel("빈칸").fill(card.answers[0]);
-    await page.getByLabel("빈칸").press("Enter");
-    await expect(page.getByText("정답", { exact: true })).toBeVisible();
+    const wrongThenFix = async () => {
+      await page.getByLabel("빈칸").fill("zzz_wrong");
+      await page.getByLabel("빈칸").press("Enter");
+      await expect(page.locator("article").getByRole("alert")).toBeVisible();
+      await page.getByLabel("빈칸").fill(card.answers[0]);
+      await page.getByLabel("빈칸").press("Enter");
+      await expect(page.getByText("정답", { exact: true })).toBeVisible();
+    };
+    await wrongThenFix();
     await expect(page.getByText("처음 단계로 돌아갑니다")).toBeVisible();
     await expect(page.locator("article").getByText("5분 뒤 복습")).toBeVisible();
     expect(await storedCard(page, card.id)).toMatchObject({ box: 0, lapses: 1 });
     const answered = await page.evaluate(() => Object.values((JSON.parse(localStorage.getItem("sjt:daily:v1") ?? "{}") as { days: Record<string, { answered: number }> }).days)[0].answered);
     expect(answered).toBe(1);
+    await page.getByRole("button", { name: "계속" }).click();
+
+    // 나머지 카드를 바로 맞히면 끝에 그 카드가 다시 나온다(바로 이어서 나오지 않는다)
+    let rest = 0;
+    for (;;) {
+      const c = await shownCard(page);
+      if (c.id === card.id) break;
+      rest++;
+      await page.getByLabel("빈칸").fill(c.answers[0]);
+      await page.getByLabel("빈칸").press("Enter");
+      await expect(page.getByText("정답", { exact: true })).toBeVisible();
+      await page.getByRole("button", { name: "계속" }).click();
+    }
+    expect(rest).toBeGreaterThan(0);
+    await expect(page.getByText("다시", { exact: true })).toBeVisible();
+    // 다시 나온 카드에서 또 틀렸다 고치면 한 번 더 나온다. 틀리지 않고 맞히면 세션이 끝난다
+    await wrongThenFix();
+    await page.getByRole("button", { name: "계속" }).click();
+    expect((await shownCard(page)).id).toBe(card.id);
+    await page.getByLabel("빈칸").fill(card.answers[0]);
+    await page.getByLabel("빈칸").press("Enter");
+    await expect(page.getByText("정답", { exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "결과 보기" })).toBeVisible();
+    expect(await storedCard(page, card.id)).toMatchObject({ box: 0, lapses: 1, reps: 1 });
   });
 });

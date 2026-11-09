@@ -113,8 +113,8 @@ export function CardSession({ queue: initial, syntax, dialectFilter, onAnswer, o
       onAnswer(card, outcome, true);
       setResults((r) => [...r, { cardId: card.id, outcome }]);
     }
-    // 정답 보기로 끝난 카드는 직접 입력해 맞힐 때까지 세션 뒤에 다시 붙는다
-    if (gaveUp) setQueue((q) => [...q, card]);
+    // 틀린 카드(정답 보기, 오답 뒤 고쳐 맞힘)는 세션 뒤에 다시 붙는다. 다시 나와 틀리지 않고 맞혀야 빠진다
+    if (outcome === "wrong") setQueue((q) => [...q, card]);
   };
 
   const submit = () => {
