@@ -8,8 +8,8 @@ export const DIALECT_LABEL: Record<Dialect, string> = {
   mysql: "MySQL",
 };
 
-/** 화면에서 고를 수 있는 방언. MySQL 은 실행 코드만 두고 화면에서는 숨긴다 */
-export const UI_DIALECTS = ["postgres", "bigquery"] as const satisfies readonly Dialect[];
+/** 화면에서 고를 수 있는 방언. MySQL 은 서버에 연결했을 때만(NEXT_PUBLIC_MYSQL=1, MYSQL_URL 과 함께 설정) 보인다 */
+export const UI_DIALECTS: readonly Dialect[] = process.env.NEXT_PUBLIC_MYSQL === "1" ? DIALECTS : ["postgres", "bigquery"];
 
 export const DialectSchema = z.enum(DIALECTS);
 
@@ -202,6 +202,8 @@ export const ProblemSchema = z.object({
   format: ProblemFormatSchema,
   difficulty: DifficultySchema,
   tags: z.array(z.string()).default([]),
+  /** 유형 탭에서 이 문제가 속하는 유형(Skill.id). 앞에 둔 것이 대표 유형 */
+  skills: z.array(z.string()).default([]),
   prompt: z.string(),
   requirements: z.array(z.string()).default([]),
   hints: z.array(z.string()).default([]),
@@ -300,3 +302,23 @@ export const SyntaxRefSchema = z.object({
     .min(1),
 });
 export type SyntaxRef = z.infer<typeof SyntaxRefSchema>;
+
+export const SKILL_SHELVES = ["pattern", "function", "basics"] as const;
+export type SkillShelf = (typeof SKILL_SHELVES)[number];
+export const SKILL_SHELF_LABEL: Record<SkillShelf, string> = {
+  pattern: "패턴",
+  function: "함수",
+  basics: "기초 문법",
+};
+
+/** 유형 탭의 묶음. 문제는 problem.skills 로, 카드는 syntax(SyntaxRef.id)로 이어진다 */
+export const SkillSchema = z.object({
+  id: z.string(),
+  shelf: z.enum(SKILL_SHELVES),
+  title: z.string(),
+  summary: z.string(),
+  /** 같은 선반 안에서 정렬 순서(작을수록 앞) */
+  order: z.number().default(100),
+  syntax: z.array(z.string()).default([]),
+});
+export type Skill = z.infer<typeof SkillSchema>;

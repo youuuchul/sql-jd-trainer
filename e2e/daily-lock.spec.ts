@@ -46,7 +46,7 @@ const setGoal = async (page: Page, goal: string) => {
 };
 const syntaxTitle = new Map((JSON.parse(readFileSync("content/syntax/functions.json", "utf-8")) as SyntaxRef[]).map((s) => [s.id, s.title]));
 
-test("연습: 분류 순서와 잠긴 세트 표시", async ({ page }) => {
+test("코스: 분류 순서와 잠긴 세트 표시", async ({ page }) => {
   await page.goto("/practice");
   const cards = page.locator("button[aria-pressed] > b");
   await expect(cards).toHaveText(["기초 문법", "직무별 실무", "데이터 파이프라인", "쿼리 리뷰", "비공개"]);

@@ -13,6 +13,7 @@ import { MAX_ROWS } from "@/lib/engine/types";
 import { compareResult, diagnose, type CompareResult, type Diagnosis } from "@/lib/grading";
 import { gradeScript } from "@/lib/grading/script";
 import { useDialect, useProblemProgress } from "@/lib/progress";
+import { recordSkillResult } from "@/lib/skills";
 import { DialectSelector, EngineStatusLabel } from "./DialectSelector";
 import { GradeBanner } from "./GradeBanner";
 import { McqProblem } from "./McqProblem";
@@ -33,6 +34,8 @@ export interface WorkspaceProps {
   mode?: "practice" | "mock";
   /** 연습 모드에서 풀이 머리(위치·이전·다음)에 쓰는 세트 정보 */
   nav?: SetNav;
+  /** 유형에서 들어왔을 때(?skill=) 쓸 풀이 머리. 유형 id → 그 유형의 문제 순서 */
+  skillNavs?: Record<string, SetNav>;
   onGraded?: (passed: boolean) => void;
   footer?: React.ReactNode;
 }
@@ -85,7 +88,19 @@ const subscribeNever = () => () => {};
 
 type MobileTab = "problem" | "editor" | "result" | "schema";
 
-export function Workspace({ problem, schema, mode = "practice", nav, onGraded, footer }: WorkspaceProps) {
+const readSkillParam = () => new URLSearchParams(window.location.search).get("skill");
+
+export function Workspace({ problem, schema, mode = "practice", nav: setNav, skillNavs, onGraded: onGradedProp, footer }: WorkspaceProps) {
+  const skillParam = useSyncExternalStore(subscribeNever, readSkillParam, () => null);
+  const nav = (skillParam ? skillNavs?.[skillParam] : undefined) ?? setNav;
+  const primarySkill = problem.skills[0];
+  const onGraded = useCallback(
+    (passed: boolean) => {
+      recordSkillResult(primarySkill, passed);
+      onGradedProp?.(passed);
+    },
+    [primarySkill, onGradedProp],
+  );
   const [dialect, setDialect] = useDialect();
   const [progress, update] = useProblemProgress(problem.id);
   const [sql, setSql] = useState("");
@@ -158,7 +173,7 @@ export function Workspace({ problem, schema, mode = "practice", nav, onGraded, f
         setRun({ result: shown ? { ...shown, ms: g.view.ms } : { columns: [], rows: [], ms: g.view.ms, truncated: false }, cmp: g.cmp, diagnoses: g.diagnoses, script });
         setResultTab("result");
         update((p) => ({ attempts: p.attempts + 1, passed: p.passed || g.pass, passedAt: g.pass && !p.passed ? new Date().toISOString() : p.passedAt }));
-        onGraded?.(g.pass);
+        onGraded(g.pass);
       } catch (err) {
         setRun({
           error: err instanceof Error ? err.message : String(err),
@@ -179,7 +194,7 @@ export function Workspace({ problem, schema, mode = "practice", nav, onGraded, f
         setRun({ result, cmp, diagnoses });
         setResultTab("result");
         update((p) => ({ attempts: p.attempts + 1, passed: p.passed || cmp.pass, passedAt: cmp.pass && !p.passed ? new Date().toISOString() : p.passedAt }));
-        onGraded?.(cmp.pass);
+        onGraded(cmp.pass);
       } else setRun({ result });
     } catch (err) {
       setRun({ error: err instanceof QueryError ? err.message : String(err) });

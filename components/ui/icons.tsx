@@ -16,6 +16,14 @@ const PATHS = {
       <path d="M8.4 18H15a3 3 0 0 0 0-6H9a3 3 0 0 1 0-6h6.6" />
     </>
   ),
+  skills: (
+    <>
+      <rect x="4" y="4" width="7" height="7" rx="2" />
+      <rect x="13" y="4" width="7" height="7" rx="2" />
+      <rect x="4" y="13" width="7" height="7" rx="2" />
+      <circle cx="16.5" cy="16.5" r="3.5" />
+    </>
+  ),
   jd: (
     <>
       <rect x="3" y="7" width="18" height="13" rx="2.6" />

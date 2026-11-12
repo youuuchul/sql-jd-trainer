@@ -1,14 +1,13 @@
 "use client";
 import Link from "next/link";
-import { useLayoutEffect, useMemo, useSyncExternalStore, type CSSProperties } from "react";
+import { useLayoutEffect, useSyncExternalStore, type CSSProperties } from "react";
 import { PathScene } from "@/components/path/PathScene";
 import { sceneFor } from "@/components/path/scenes";
 import { CAT_CLASS, CAT_SHORT } from "@/components/ui/category";
 import { FORMAT_ICON, Icon } from "@/components/ui/icons";
 import { PathNode } from "@/components/ui/PathNode";
 import { splitSetTitle } from "./setTitle";
-import { dayKey, streak } from "@/lib/daily/srs";
-import { useDailyStore, useNow } from "@/lib/daily/store";
+import { ResumeRow } from "@/components/home/ResumeList";
 import { DIFFICULTY_LABEL, FORMAT_LABEL, SET_CATEGORY_LABEL, type SetCategory } from "@/lib/content/types";
 import { usePath, type CategoryPath, type PathNode as PathNodeData, type PathSet, type SetPath } from "@/lib/path";
 
@@ -18,35 +17,6 @@ const WAVE = [0, 0.5, 0.86, 0.5, 0, -0.5, -0.86, -0.5];
 const sceneIndex = (n: number) => Math.min(2, n - 1);
 
 const nodeMeta = (n: PathNodeData) => `${FORMAT_LABEL[n.problem.format]} · ${DIFFICULTY_LABEL[n.problem.difficulty]}${n.problem.timeLimitMin ? ` · ${n.problem.timeLimitMin}분` : ""}`;
-
-/** 연속 일수와 오늘 카드 수. 하루 카드 저장값을 읽기만 한다 */
-function StatusLine() {
-  const { store } = useDailyStore();
-  const [now] = useNow();
-  const { goal } = store.settings;
-  const days = useMemo(() => streak(new Set(Object.entries(store.days).filter(([, d]) => d.answered >= goal).map(([k]) => k)), now), [store.days, goal, now]);
-  const answered = now ? (store.days[dayKey(now)]?.answered ?? 0) : 0;
-  return (
-    <header className="flex h-12 items-center gap-2">
-      <h1 className="mr-auto text-[19px] font-extrabold tracking-[-0.03em]">연습</h1>
-      {now > 0 && (
-        <>
-          <span className={`inline-flex h-8 items-center gap-1 rounded-full pr-2.5 pl-2 text-[14px] font-extrabold tabular-nums ${days ? "bg-flame-soft text-flame-deep dark:text-flame" : "bg-surface-2 text-muted"}`} aria-label={`${days}일 연속`}>
-            <Icon name="flame" size={17} filled className={days ? "text-flame" : "text-faint"} />
-            {days}
-          </span>
-          <Link href="/" className="inline-flex h-8 items-center gap-1 rounded-full bg-surface-2 pr-2.5 pl-2 text-[14px] font-extrabold text-fg-2 tabular-nums focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent" aria-label={`오늘 카드 ${answered} / ${goal}`}>
-            <Icon name="today" size={16} strokeWidth={2.2} className="text-accent" />
-            <span>
-              {Math.min(answered, goal)}
-              <span className="font-semibold text-muted">/{goal}</span>
-            </span>
-          </Link>
-        </>
-      )}
-    </header>
-  );
-}
 
 function CategoryChip({ cat, on, onSelect }: { cat: CategoryPath; on: boolean; onSelect: () => void }) {
   const base = "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-[14px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
@@ -170,15 +140,17 @@ const writeView = (patch: Partial<SavedView>) => {
   }
   if (patch.cat !== undefined) viewListeners.forEach((l) => l());
 };
+/** 코스 맨 위에 올리는 풀던 문제 수 */
+const MAX_RESUME = 3;
 const subscribeView = (l: () => void) => {
   viewListeners.add(l);
   return () => viewListeners.delete(l);
 };
 const noSubscribe = () => () => {};
 
-/** 연습 탭: 상태 줄, 분류 칩, 선택한 분류의 세트별 배너와 사인파 경로. 순서는 권장만이라 모두 열려 있고 잠김은 비공개 분류뿐이다 */
+/** 코스 탭: 풀던 문제, 분류 칩, 선택한 분류의 세트별 배너와 사인파 경로. 순서는 권장만이라 모두 열려 있고 잠김은 비공개 분류뿐이다 */
 export function PracticeView({ sets }: { sets: PathSet[] }) {
-  const { categories } = usePath(sets);
+  const { categories, inProgress } = usePath(sets);
   const hydrated = useSyncExternalStore(noSubscribe, () => true, () => false);
   const picked = parseView(useSyncExternalStore(subscribeView, () => viewRaw ?? readViewRaw(), () => null)).cat;
   const selected = categories.find((c) => c.category === picked) ?? categories.find((c) => !c.locked && c.current) ?? categories.find((c) => !c.locked) ?? categories[0];
@@ -214,7 +186,16 @@ export function PracticeView({ sets }: { sets: PathSet[] }) {
   return (
     <div className="w-full overflow-x-clip">
       <div className="mx-auto w-full max-w-[560px] px-5 pt-1 pb-8 lg:pt-6">
-        <StatusLine />
+        <header className="flex h-12 items-center">
+          <h1 className="text-[19px] font-extrabold tracking-[-0.03em]">코스</h1>
+        </header>
+        {inProgress.length > 0 && (
+          <section aria-label="풀던 문제" className="mb-3 grid grid-cols-[minmax(0,1fr)] gap-2.5">
+            {inProgress.slice(0, MAX_RESUME).map((n) => (
+              <ResumeRow key={n.problem.id} node={n} chip="미통과" />
+            ))}
+          </section>
+        )}
         <div className="-mx-5 flex gap-2 overflow-x-auto px-5 pt-1 pb-2 [scrollbar-width:none]">
           {categories.map((c) => (
             <CategoryChip key={c.category} cat={c} on={c.category === selected?.category} onSelect={() => writeView({ cat: c.category })} />

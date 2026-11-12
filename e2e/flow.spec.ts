@@ -20,7 +20,7 @@ const waitReady = async (page: Page) => {
 test("문제 풀이 흐름: PostgreSQL 정답·오답 진단·BigQuery·MySQL·진행 저장", async ({ page }) => {
   const p = problem("ba-01-where-in-compare");
   await page.goto("/practice");
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("연습");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("코스");
   await page.goto("/sets/basics-01-select-filter");
   await page.getByRole("link", { name: new RegExp(p.title) }).click();
   await expect(page).toHaveURL(new RegExp(`/problems/${p.id}`));

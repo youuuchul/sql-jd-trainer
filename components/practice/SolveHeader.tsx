@@ -15,10 +15,18 @@ export interface SetNav {
   domain: string;
   items: { id: string; title: string }[];
   index: number;
+  /** 유형에서 들어온 풀이: 돌아갈 주소, 머리에 쓸 이름, 이전·다음 주소에 붙일 질의 */
+  back?: string;
+  label?: string;
+  query?: string;
 }
 
+const backOf = (nav?: SetNav) => (nav ? (nav.back ?? `/sets/${nav.setId}`) : "/practice");
+const hrefOf = (nav: SetNav, id: string) => `/problems/${id}${nav.query ?? ""}`;
+const kickerOf = (nav: SetNav) => nav.label ?? CAT_SHORT[nav.category];
+
 /** 뒤로 버튼의 접근성 이름은 실제 목적지를 따른다 */
-const backLabel = (href: string) => (href.startsWith("/sets/") ? "세트로 돌아가기" : href.startsWith("/practice") ? "연습으로 돌아가기" : href.startsWith("/jd") ? "공고로 돌아가기" : "돌아가기");
+const backLabel = (href: string) => (href.startsWith("/sets/") ? "세트로 돌아가기" : href.startsWith("/practice") ? "코스로 돌아가기" : href.startsWith("/skills") ? "유형으로 돌아가기" : href.startsWith("/jd") ? "공고로 돌아가기" : "돌아가기");
 
 export function BackButton({ href }: { href: string }) {
   return (
@@ -36,11 +44,11 @@ export function BackButton({ href }: { href: string }) {
 export function SolveTopMobile({ nav, title, onSchema, schemaOpen }: { nav?: SetNav; title: string; onSchema: () => void; schemaOpen: boolean }) {
   return (
     <div className="flex h-[58px] items-center gap-2.5 pr-3.5 pl-3">
-      <BackButton href={nav ? `/sets/${nav.setId}` : "/practice"} />
+      <BackButton href={backOf(nav)} />
       <div className="min-w-0 flex-1">
         {nav && (
           <p className={`${CAT_CLASS[nav.category]} hq-catink text-xs font-bold`}>
-            {CAT_SHORT[nav.category]} · {nav.index + 1} / {nav.items.length}
+            {kickerOf(nav)} · {nav.index + 1} / {nav.items.length}
           </p>
         )}
         <p className="truncate text-[16.5px] leading-[1.3] font-extrabold tracking-[-0.025em]">{title}</p>
@@ -65,11 +73,11 @@ export function SolveTopDesktop({ nav }: { nav?: SetNav }) {
   const next = nav && nav.index < nav.items.length - 1 ? nav.items[nav.index + 1] : null;
   return (
     <header className={`mb-3 flex h-11 shrink-0 items-center gap-3 ${nav ? CAT_CLASS[nav.category] : ""}`}>
-      <BackButton href={nav ? `/sets/${nav.setId}` : "/practice"} />
+      <BackButton href={backOf(nav)} />
       {nav && (
         <>
           <span className="hq-catink text-sm font-bold">
-            {CAT_SHORT[nav.category]} · {splitSetTitle(nav.setTitle, nav.category).name}
+            {nav.label ?? `${CAT_SHORT[nav.category]} · ${splitSetTitle(nav.setTitle, nav.category).name}`}
           </span>
           <span className="ml-1.5 flex gap-1.5" aria-hidden="true">
             {nav.items.map((it, i) => {
@@ -82,7 +90,7 @@ export function SolveTopDesktop({ nav }: { nav?: SetNav }) {
           </span>
           <span className="ml-auto flex gap-2">
             {prev ? (
-              <Button href={`/problems/${prev.id}`} tone="ghost" size="xs">
+              <Button href={hrefOf(nav, prev.id)} tone="ghost" size="xs">
                 이전
               </Button>
             ) : (
@@ -91,7 +99,7 @@ export function SolveTopDesktop({ nav }: { nav?: SetNav }) {
               </Button>
             )}
             {next ? (
-              <Button href={`/problems/${next.id}`} tone="ghost" size="xs">
+              <Button href={hrefOf(nav, next.id)} tone="ghost" size="xs">
                 다음
               </Button>
             ) : (

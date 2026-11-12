@@ -7,16 +7,18 @@ import { Icon, type IconName } from "@/components/ui/icons";
 import { SettingsBox } from "./SettingsBox";
 import { useTabBarHidden } from "./tabbar";
 
-type NavKey = "today" | "practice" | "jd";
+type NavKey = "today" | "practice" | "skills" | "jd";
 const NAV: { key: NavKey; href: string; label: string; icon: IconName }[] = [
   { key: "today", href: "/", label: "오늘", icon: "today" },
-  { key: "practice", href: "/practice", label: "연습", icon: "practice" },
+  { key: "practice", href: "/practice", label: "코스", icon: "practice" },
+  { key: "skills", href: "/skills", label: "유형", icon: "skills" },
   { key: "jd", href: "/jd", label: "공고", icon: "jd" },
 ];
 
 const activeOf = (path: string): NavKey | null => {
   if (path === "/" || path.startsWith("/daily")) return "today";
   if (path.startsWith("/jd") || path === "/mock/jd") return "jd";
+  if (path.startsWith("/skills")) return "skills";
   if (path.startsWith("/practice") || path.startsWith("/sets/") || path.startsWith("/problems/") || path.startsWith("/mock/")) return "practice";
   return null;
 };
@@ -72,7 +74,7 @@ function Sidebar({ rail, active }: { rail: boolean; active: NavKey | null }) {
 
 function TabBar({ active }: { active: NavKey | null }) {
   return (
-    <nav aria-label="주 메뉴" className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-3 bg-tab-bg pt-2 pb-[max(env(safe-area-inset-bottom),12px)] shadow-[0_-1px_0_var(--color-line)] backdrop-blur-md lg:hidden">
+    <nav aria-label="주 메뉴" className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 bg-tab-bg pt-2 pb-[max(env(safe-area-inset-bottom),12px)] shadow-[0_-1px_0_var(--color-line)] backdrop-blur-md lg:hidden">
       {NAV.map((n) => {
         const on = n.key === active;
         return (
@@ -87,7 +89,7 @@ function TabBar({ active }: { active: NavKey | null }) {
 }
 
 /**
- * 앱 셸. 데스크톱(1024px 이상)은 왼쪽 사이드바(풀이 화면은 아이콘 레일), 모바일은 아래 탭 3개.
+ * 앱 셸. 데스크톱(1024px 이상)은 왼쪽 사이드바(풀이 화면은 아이콘 레일), 모바일은 아래 탭 4개.
  * 아래 탭이 보이면 main 아래에 탭 높이만큼 여백을 둔다.
  * viewport-fit=cover 라 위·좌우 safe-area 여백은 여기서 한 번 두고, 상태 표시줄 뒤는 바탕색 띠로 가린다.
  */

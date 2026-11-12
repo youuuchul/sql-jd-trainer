@@ -17,5 +17,6 @@ export const readLocalContent = (): { kind: string; body: unknown }[] => {
     ...read("sets").map((body) => ({ kind: "set", body })),
     ...read("cards").map((body) => ({ kind: "deck", body })),
     ...read("syntax").flatMap((list) => (list as unknown[]).map((body) => ({ kind: "syntax", body }))),
+    ...read("skills").flatMap((list) => (list as unknown[]).map((body) => ({ kind: "skill", body }))),
   ];
 };

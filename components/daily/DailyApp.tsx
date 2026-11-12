@@ -1,6 +1,7 @@
 "use client";
 import { useMemo, useRef, useState } from "react";
 import { Home } from "@/components/home/Home";
+import type { SkillView } from "@/lib/skills";
 import { SettingsSheet } from "@/components/home/SettingsSheet";
 import type { PathSet } from "@/lib/path";
 import type { CardDeck, SyntaxRef } from "@/lib/content/types";
@@ -13,7 +14,7 @@ type View = { kind: "home" } | { kind: "session"; queue: SessionCard[] } | { kin
 
 const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
 
-export function DailyApp({ decks, syntax, pathSets }: { decks: CardDeck[]; syntax: SyntaxRef[]; pathSets: PathSet[] }) {
+export function DailyApp({ decks, syntax, pathSets, skills }: { decks: CardDeck[]; syntax: SyntaxRef[]; pathSets: PathSet[]; skills: SkillView[] }) {
   const { store, record, updateSettings } = useDailyStore();
   const [view, setView] = useState<View>({ kind: "home" });
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -87,6 +88,8 @@ export function DailyApp({ decks, syntax, pathSets }: { decks: CardDeck[]; synta
         masteredCount={masteredCount}
         week={week}
         pathSets={pathSets}
+        skills={skills}
+        now={now}
         onStart={start}
         onOpenSettings={() => setSettingsOpen(true)}
         gearRef={gearRef}

@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useSyncExternalStore } from "react";
-import type { Dialect, ReviewCategory } from "@/lib/content/types";
+import { UI_DIALECTS, type Dialect, type ReviewCategory } from "@/lib/content/types";
 
 export interface ProblemProgress {
   passed: boolean;
@@ -70,8 +70,8 @@ export const useProblemProgress = (problemId: string) => {
 const dialectListeners = new Set<() => void>();
 const readDialect = (): Dialect => {
   const v = window.localStorage.getItem(DIALECT_KEY);
-  // mysql 저장값은 화면에서 숨긴 방언이라 기본 방언으로 연다
-  return v === "bigquery" ? v : "postgres";
+  // 화면에서 숨긴 방언이 저장돼 있으면 기본 방언으로 연다
+  return UI_DIALECTS.find((d) => d === v) ?? "postgres";
 };
 const subscribeDialect = (l: () => void) => {
   dialectListeners.add(l);

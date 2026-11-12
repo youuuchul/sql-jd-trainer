@@ -34,7 +34,7 @@ export function SettingsBox({ className = "" }: { className?: string }) {
   const { goal, dialect } = store.settings;
   const rows: [string, string][] = [
     ["하루 목표", `${goal}장`],
-    ["방언", dialect === "postgres" || dialect === "bigquery" ? DIALECT_LABEL[dialect] : "전체"],
+    ["방언", dialect === "all" ? "전체" : DIALECT_LABEL[dialect]],
     ["매일 알림", push === null ? "" : push === "on" ? "오전 9시" : "꺼짐"],
   ];
   return (

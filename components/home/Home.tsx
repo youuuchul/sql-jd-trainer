@@ -1,12 +1,17 @@
 "use client";
-import { useState, type RefObject } from "react";
+import Link from "next/link";
+import type { RefObject } from "react";
 import { Selecky } from "@/components/selecky/Selecky";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/icons";
 import { ProgressRing } from "@/components/ui/ProgressRing";
+import { Chip } from "@/components/ui/Chip";
+import { SHELF_CLASS } from "@/components/skills/shelf";
+import { FORMAT_ICON } from "@/components/ui/icons";
+import { DIFFICULTY_LABEL, FORMAT_LABEL } from "@/lib/content/types";
 import { usePath, type PathSet } from "@/lib/path";
-import type { SetCategory } from "@/lib/content/types";
-import { CategoryTiles, DesktopPath, focusSet, MobilePath } from "./HomePath";
+import { useProgressStore } from "@/lib/progress";
+import { dueSkills, nextInSkill, useSkillStore, type SkillProblem, type SkillView } from "@/lib/skills";
 import { ResumeRow } from "./ResumeList";
 import { WeekStrip, type WeekDay } from "./WeekStrip";
 
@@ -22,6 +27,9 @@ export interface HomeProps {
   masteredCount: number;
   week: WeekDay[];
   pathSets: PathSet[];
+  skills: SkillView[];
+  /** 현재 시각(ms). 정해지지 않았으면 0 */
+  now: number;
   onStart: () => void;
   onOpenSettings: () => void;
   /** 설정 시트를 닫을 때 포커스가 돌아올 톱니 버튼 */
@@ -40,17 +48,46 @@ const HERO_VARS =
   "[--ring-trk:rgb(255_255_255/.24)] [--ring-bar:#fff] [--hsub:rgb(255_255_255/.74)] [--wk-off:rgb(255_255_255/.17)] [--wk-lbl:rgb(255_255_255/.72)] [--wk-today:#fff] " +
   "dark:[--ring-trk:var(--color-surface-3)] dark:[--ring-bar:var(--color-accent)] dark:[--hsub:var(--color-muted)] dark:[--wk-off:var(--color-surface-3)] dark:[--wk-lbl:var(--color-muted)] dark:[--wk-today:var(--color-fg)]";
 
+/** 오늘 화면에 올리는 복습 유형 수 */
+const MAX_REVIEW = 3;
+
+/** 복습할 유형 한 줄. 그 유형에서 다음에 풀 문제로 이동한다 */
+function ReviewRow({ skill, problem }: { skill: SkillView; problem: SkillProblem }) {
+  return (
+    <Link
+      href={`/problems/${problem.id}?skill=${skill.id}`}
+      className={`${SHELF_CLASS[skill.shelf]} flex items-center gap-3.5 rounded-[18px] bg-surface px-3.5 py-[13px] shadow-[inset_0_0_0_1.5px_var(--color-line),0_3px_0_var(--color-line)] dark:shadow-[inset_0_0_0_1px_var(--color-line)]`}
+    >
+      <span className="hq-catfill grid size-[46px] shrink-0 place-items-center rounded-[14px]">
+        <Icon name={FORMAT_ICON[problem.format]} size={22} />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="hq-catink block truncate text-xs font-bold">{skill.title}</span>
+        <span className="block truncate text-[15.5px] leading-[1.35] font-bold tracking-[-0.02em]">{problem.title}</span>
+        <span className="mt-px block truncate text-[12.5px] font-medium text-muted">
+          {FORMAT_LABEL[problem.format]} · {DIFFICULTY_LABEL[problem.difficulty]}
+          {problem.timeLimitMin ? ` · ${problem.timeLimitMin}분` : ""}
+        </span>
+      </span>
+      <Chip tone="flame" size="sm">
+        복습
+      </Chip>
+    </Link>
+  );
+}
+
 export function Home(props: HomeProps) {
-  const { ready, dateLabel, goal, answered, streak, dueCount, freshCount, masteredCount, week, pathSets, onStart, onOpenSettings, gearRef } = props;
-  const { categories, next, inProgress } = usePath(pathSets);
-  const [picked, setPicked] = useState<SetCategory | null>(null);
+  const { ready, dateLabel, goal, answered, streak, dueCount, freshCount, masteredCount, week, pathSets, skills, now, onStart, onOpenSettings, gearRef } = props;
+  const { next } = usePath(pathSets);
+  const progress = useProgressStore();
+  const reviews = useSkillStore();
+  const due = (ready ? dueSkills(skills, reviews, now) : []).slice(0, MAX_REVIEW).flatMap((skill) => {
+    const problem = nextInSkill(skill.problems, progress);
+    return problem ? [{ skill, problem }] : [];
+  });
   const canStart = dueCount + freshCount > 0;
   const remaining = Math.max(goal - answered, 0);
   const startLabel = !canStart ? "지금 풀 카드가 없습니다" : remaining === 0 ? `${goal}장 더 풀기` : answered ? "이어서 풀기" : "시작하기";
-  const resume = inProgress.slice(0, next && !inProgress.some((n) => n.problem.id === next.problem.id) ? 2 : 3);
-  const nextRow = next && !inProgress.some((n) => n.problem.id === next.problem.id) ? next : null;
-  const pathCategory = picked ?? next?.set.category ?? categories.find((c) => !c.locked)?.category;
-  const mobileSet = next ? categories.find((c) => c.category === next.set.category)?.sets.find((s) => s.set.id === next.set.id) : categories.filter((c) => !c.locked).map(focusSet).find(Boolean);
 
   return (
     <div className="mx-auto w-full max-w-lg px-5 pt-3 pb-4 lg:max-w-[1240px] lg:px-10 lg:py-8">
@@ -110,30 +147,18 @@ export function Home(props: HomeProps) {
           </div>
         </section>
 
-        {(resume.length > 0 || nextRow) && (
-          <section aria-label="풀던 문제" className="mt-1 lg:mt-0 lg:rounded-[18px] lg:bg-surface lg:p-5 lg:pb-3 lg:shadow-[inset_0_0_0_1.5px_var(--color-line),0_3px_0_var(--color-line)] lg:dark:shadow-[inset_0_0_0_1px_var(--color-line)]">
-            <h3 className="mx-0.5 mb-2.5 text-[17px] font-extrabold tracking-[-0.02em]">{resume.length ? "풀던 문제" : "다음 문제"}</h3>
+        {(due.length > 0 || next) && (
+          <section aria-label="문제 복습" className="mt-1 lg:mt-0 lg:rounded-[18px] lg:bg-surface lg:p-5 lg:pb-3 lg:shadow-[inset_0_0_0_1.5px_var(--color-line),0_3px_0_var(--color-line)] lg:dark:shadow-[inset_0_0_0_1px_var(--color-line)]">
+            <h3 className="mx-0.5 mb-2.5 text-[17px] font-extrabold tracking-[-0.02em]">{due.length ? "문제 복습" : "다음 문제"}</h3>
             <div className="grid grid-cols-[minmax(0,1fr)] gap-2.5 lg:pb-2">
-              {resume.map((n) => (
-                <ResumeRow key={n.problem.id} node={n} chip="미통과" />
+              {due.map(({ skill, problem }) => (
+                <ReviewRow key={skill.id} skill={skill} problem={problem} />
               ))}
-              {nextRow && <ResumeRow node={nextRow} chip="다음" />}
+              {!due.length && next && <ResumeRow node={next} chip="다음" />}
             </div>
           </section>
         )}
       </div>
-
-      {mobileSet && (
-        <div className="lg:hidden">
-          <MobilePath set={mobileSet} />
-        </div>
-      )}
-      {pathCategory && (
-        <div className="hidden lg:block">
-          <DesktopPath categories={categories} category={pathCategory} onCategory={setPicked} />
-          <CategoryTiles categories={categories} />
-        </div>
-      )}
     </div>
   );
 }
