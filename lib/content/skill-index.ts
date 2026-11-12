@@ -6,7 +6,7 @@ import type { Difficulty } from "./types";
 const DIFF_RANK: Record<Difficulty, number> = { basic: 0, intermediate: 1, advanced: 2 };
 
 /**
- * 유형 탭용 요약. 잠긴 스키마의 문제는 넣지 않는다. 문제는 쉬운 것부터 정렬한다.
+ * 유형 탭용 요약. 잠긴 스키마의 문제는 넣지 않는다. 문제는 쉬운 것부터, 같은 난이도에서는 이 유형이 대표 유형인 문제부터 정렬한다.
  *
  * Returns:
  *   선반(패턴 → 함수 → 기초 문법)과 order 순의 유형 목록.
@@ -24,7 +24,7 @@ export const listSkillViews = async (): Promise<SkillView[]> => {
     cardCount: cards.filter((c) => c.syntax.some((id) => s.syntax.includes(id))).length,
     problems: open
       .filter((p) => p.skills.includes(s.id))
-      .sort((a, b) => DIFF_RANK[a.difficulty] - DIFF_RANK[b.difficulty] || a.id.localeCompare(b.id))
+      .sort((a, b) => DIFF_RANK[a.difficulty] - DIFF_RANK[b.difficulty] || Number(b.skills[0] === s.id) - Number(a.skills[0] === s.id) || a.id.localeCompare(b.id))
       .map((p) => ({ id: p.id, title: p.title, difficulty: p.difficulty, format: p.format, timeLimitMin: p.timeLimitMin ?? null, primary: p.skills[0] === s.id, blanks: Boolean(p.blanks && !p.script) })),
   }));
 };

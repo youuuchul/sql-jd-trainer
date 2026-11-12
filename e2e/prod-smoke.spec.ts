@@ -28,7 +28,7 @@ test("배포 스모크: PostgreSQL·BigQuery 실행, MySQL 미연결 안내", as
   await expect(page.getByText("정답", { exact: true })).toBeVisible();
 
   // MySQL 은 화면에서 숨겼다. 서버 경로는 연결되면 ok, 아니면 미연결 안내를 준다
-  await expect(page.getByRole("radio", { name: "MySQL" })).toHaveCount(0);
+  await expect(page.getByRole("radio", { name: "MySQL" })).toHaveCount(process.env.NEXT_PUBLIC_MYSQL === "1" ? 1 : 0);
   const res = await page.request.get("/api/engine/mysql");
   const body = (await res.json()) as { ok: boolean; error?: string };
   expect(body.ok || /연결/.test(body.error ?? "")).toBe(true);

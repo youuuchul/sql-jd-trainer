@@ -65,7 +65,7 @@ test("문제 풀이 흐름: PostgreSQL 정답·오답 진단·BigQuery·MySQL·�
   await expect(page.getByText("정답", { exact: true })).toBeVisible();
 
   // MySQL (원격 Route Handler). 화면에서는 고를 수 없어 브라우저 엔진이 부르는 경로를 직접 부른다
-  await expect(page.getByRole("radio", { name: "MySQL" })).toHaveCount(0);
+  await expect(page.getByRole("radio", { name: "MySQL" })).toHaveCount(process.env.NEXT_PUBLIC_MYSQL === "1" ? 1 : 0);
   const mysql = (sql: string) => page.request.post("/api/engine/mysql", { data: { schemaId: p.schema, sql } });
   const solved = await mysql(p.solutions!.mysql!);
   expect(solved.ok(), await solved.text()).toBeTruthy();

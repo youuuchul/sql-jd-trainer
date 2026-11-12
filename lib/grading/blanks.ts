@@ -34,5 +34,15 @@ export const splitBlanks = (solution: string, tokens: string[]): BlankSplit | nu
   return { parts, answers: found.map((f) => f.token) };
 };
 
+/** 괄호와 작은따옴표의 짝이 맞는지. 짝이 안 맞는 글은 식 중간에서 잘린 것이라 빈칸으로 쓰지 않는다 */
+export const isBalanced = (text: string): boolean => {
+  let depth = 0;
+  for (const ch of text) {
+    if (ch === "(") depth++;
+    else if (ch === ")" && --depth < 0) return false;
+  }
+  return depth === 0 && text.split("'").length % 2 === 1;
+};
+
 /** 빈칸에 넣은 글로 쿼리를 다시 잇는다 */
 export const joinBlanks = (parts: string[], values: string[]): string => parts.map((p, i) => p + (i < values.length ? values[i] : "")).join("");

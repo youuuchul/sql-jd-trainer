@@ -123,7 +123,7 @@ test.describe("하루 카드 (모바일)", () => {
     // 풀고 나면 이 카드의 함수 문법이 함께 보인다
     const grammar = page.getByRole("region", { name: "문법" });
     for (const id of first.syntax) await expect(grammar).toContainText(syntaxTitle.get(id)!);
-    await expect(grammar).not.toContainText("MySQL");
+    if (process.env.NEXT_PUBLIC_MYSQL !== "1") await expect(grammar).not.toContainText("MySQL");
     // 기록은 카드가 끝날 때: 틀린 카드는 처음 상자(5분)
     expect(await storedCard(page, first.id)).toMatchObject({ box: 0, lapses: 1 });
     await page.getByRole("button", { name: "계속" }).click();

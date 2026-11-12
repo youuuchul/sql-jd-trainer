@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { problem, problems } from "./content";
+import { problem, problems, set } from "./content";
 
 const SKILL = "b-null";
 const DAY = 86400000;
@@ -113,4 +113,35 @@ test("빈칸 채우기: 가린 자리를 채워 실행하면 결과로 채점하
   await page.getByRole("button", { name: "직접 작성" }).click();
   await expect(page.locator(".cm-content")).toBeVisible();
   await expect(blanks).toHaveCount(0);
+});
+
+test("숙박 예약 모의 시험: 60분 타이머로 시작해 첫 문제를 채점하고 종료 요약을 본다", async ({ page }) => {
+  const mock = set("jobs-stay-mock");
+  const firstMock = problem(mock.problems[0]);
+  await page.goto(`/mock/${mock.id}`);
+  await page.getByRole("button", { name: "시작" }).click();
+  await expect(page.getByText(/남은 시간 59:/)).toBeVisible();
+  await expect(page.getByText("준비됨")).toBeVisible({ timeout: 90_000 });
+  await setEditor(page, firstMock.solutions!.postgres!);
+  await page.getByRole("button", { name: /실행/ }).click();
+  await expect(page.getByText("정답", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "다음 문제" }).click();
+  await expect(page.getByText(`2 / ${mock.problems.length}`)).toBeVisible();
+  await page.getByRole("button", { name: "시험 종료" }).click();
+  await expect(page.getByText(new RegExp(`${mock.problems.length}문제 중 1문제 정답`))).toBeVisible();
+});
+
+test("MySQL: 화면에서 MySQL 을 골라 숙박 예약 문제를 채점한다", async ({ page }) => {
+  test.skip(process.env.NEXT_PUBLIC_MYSQL !== "1", "NEXT_PUBLIC_MYSQL=1 로 띄운 서버에서만");
+  const p = problem("st-d3-first-booking-within-7d");
+  await page.goto(`/problems/${p.id}`);
+  await page.getByRole("radio", { name: "MySQL" }).click();
+  await expect(page.getByText("준비됨")).toBeVisible({ timeout: 90_000 });
+  await setEditor(page, p.solutions!.mysql!);
+  await page.getByRole("button", { name: /실행/ }).click();
+  await expect(page.getByText("정답", { exact: true })).toBeVisible();
+  await page.goto(`/problems/${p.id}?mode=blank`);
+  await expect(page.getByRole("radio", { name: "MySQL" })).toBeChecked();
+  const blanks = page.getByRole("textbox", { name: /^빈칸 \d+$/ });
+  await expect(blanks).toHaveCount(p.blanks!.mysql!.length);
 });

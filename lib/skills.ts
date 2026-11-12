@@ -99,7 +99,7 @@ const DIFF_RANK: Record<Difficulty, number> = { basic: 0, intermediate: 1, advan
 const STATE_RANK: Record<ProblemState, number> = { fail: 0, todo: 1, pass: 2 };
 
 /**
- * 유형 안에서 다음에 풀 문제. 틀린 문제, 안 푼 문제(쉬운 것부터), 통과한 지 가장 오래된 문제 순이다.
+ * 유형 안에서 다음에 풀 문제. 이 유형이 대표 유형인 문제 가운데 틀린 문제, 안 푼 문제(쉬운 것부터), 통과한 지 가장 오래된 문제 순이다.
  *
  * Args:
  *   problems: 유형의 문제 목록.
@@ -109,7 +109,8 @@ const STATE_RANK: Record<ProblemState, number> = { fail: 0, todo: 1, pass: 2 };
  *   문제가 없으면 null.
  */
 export const nextInSkill = (problems: SkillProblem[], progress: Record<string, ProblemProgress>): SkillProblem | null => {
-  const ranked = [...problems].sort((a, b) => {
+  const own = problems.filter((p) => p.primary);
+  const ranked = [...(own.length ? own : problems)].sort((a, b) => {
     const sa = problemState(progress[a.id]);
     const sb = problemState(progress[b.id]);
     if (sa !== sb) return STATE_RANK[sa] - STATE_RANK[sb];

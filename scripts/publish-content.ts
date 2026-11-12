@@ -11,7 +11,7 @@ import path from "node:path";
 import { loadEnvConfig } from "@next/env";
 import { neon } from "@neondatabase/serverless";
 import { CardDeckSchema, DIALECTS, ProblemSchema, ProblemSetSchema, SchemaDefSchema, SkillSchema, SyntaxRefSchema, type SchemaDef } from "../lib/content/types";
-import { splitBlanks } from "../lib/grading/blanks";
+import { isBalanced, splitBlanks } from "../lib/grading/blanks";
 import { checkScriptProblem } from "../lib/grading/script-check";
 
 loadEnvConfig(process.cwd(), true);
@@ -59,6 +59,8 @@ const collect = (): Row[] => {
       if (!tokens) continue;
       const solution = p.solutions?.[d];
       if (p.script || !solution || !splitBlanks(solution, tokens)) throw new Error(`${file}: blanks.${d} 가 정답 쿼리에 한 번씩 나오지 않거나 겹칩니다.`);
+      const cut = tokens.find((t) => !isBalanced(t));
+      if (cut) throw new Error(`${file}: blanks.${d} 의 "${cut}" 는 괄호나 따옴표 짝이 맞지 않습니다.`);
     }
     if (problemIds.has(p.id)) throw new Error(`${file}: 문제 id 중복 ${p.id}`);
     problemIds.add(p.id);
