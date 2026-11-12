@@ -25,6 +25,6 @@ export const listSkillViews = async (): Promise<SkillView[]> => {
     problems: open
       .filter((p) => p.skills.includes(s.id))
       .sort((a, b) => DIFF_RANK[a.difficulty] - DIFF_RANK[b.difficulty] || a.id.localeCompare(b.id))
-      .map((p) => ({ id: p.id, title: p.title, difficulty: p.difficulty, format: p.format, timeLimitMin: p.timeLimitMin ?? null, primary: p.skills[0] === s.id })),
+      .map((p) => ({ id: p.id, title: p.title, difficulty: p.difficulty, format: p.format, timeLimitMin: p.timeLimitMin ?? null, primary: p.skills[0] === s.id, blanks: Boolean(p.blanks && !p.script) })),
   }));
 };

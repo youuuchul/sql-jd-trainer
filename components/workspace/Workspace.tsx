@@ -13,7 +13,9 @@ import { MAX_ROWS } from "@/lib/engine/types";
 import { compareResult, diagnose, type CompareResult, type Diagnosis } from "@/lib/grading";
 import { gradeScript } from "@/lib/grading/script";
 import { useDialect, useProblemProgress } from "@/lib/progress";
+import { splitBlanks } from "@/lib/grading/blanks";
 import { recordSkillResult } from "@/lib/skills";
+import { BlankEditor } from "./BlankEditor";
 import { DialectSelector, EngineStatusLabel } from "./DialectSelector";
 import { GradeBanner } from "./GradeBanner";
 import { McqProblem } from "./McqProblem";
@@ -89,6 +91,7 @@ const subscribeNever = () => () => {};
 type MobileTab = "problem" | "editor" | "result" | "schema";
 
 const readSkillParam = () => new URLSearchParams(window.location.search).get("skill");
+const readBlankParam = () => new URLSearchParams(window.location.search).get("mode") === "blank";
 
 export function Workspace({ problem, schema, mode = "practice", nav: setNav, skillNavs, onGraded: onGradedProp, footer }: WorkspaceProps) {
   const skillParam = useSyncExternalStore(subscribeNever, readSkillParam, () => null);
@@ -111,6 +114,16 @@ export function Workspace({ problem, schema, mode = "practice", nav: setNav, ski
   const [resultTab, setResultTab] = useState("result");
   const [tab, setTab] = useState<MobileTab>("problem");
   const { status, run: execute, runScript } = useEngine(dialect, schema);
+  const blankParam = useSyncExternalStore(subscribeNever, readBlankParam, () => false);
+  const [blankPick, setBlankPick] = useState<boolean | null>(null);
+  const [blankSql, setBlankSql] = useState("");
+  const blankSplit = useMemo(() => {
+    const tokens = problem.blanks?.[dialect];
+    const solutionSql = problem.solutions?.[dialect];
+    return mode === "practice" && !problem.script && tokens && solutionSql ? splitBlanks(solutionSql, tokens) : null;
+  }, [problem, dialect, mode]);
+  const blankOn = blankSplit !== null && (blankPick ?? blankParam);
+  const activeSql = blankOn ? blankSql : sql;
   const desktop = useDesktop();
 
   // 하이드레이션 중에는 저장소(localStorage)·방언이 서버 값이라, 끝난 뒤에 저장된 쿼리를 불러온다.
@@ -151,13 +164,14 @@ export function Workspace({ problem, schema, mode = "practice", nav: setNav, ski
 
   const changeDialect = (d: Dialect) => {
     update((p) => ({ sql: { ...p.sql, [dialect]: sql } }));
+    setBlankSql("");
     setDialect(d);
   };
 
   const onRun = useCallback(async () => {
-    if (!sql.trim() || running) return;
+    if (!activeSql.trim() || running) return;
     setRunning(true);
-    update((p) => ({ sql: { ...p.sql, [dialect]: sql } }));
+    if (!blankOn) update((p) => ({ sql: { ...p.sql, [dialect]: sql } }));
     if (problem.script) {
       try {
         const g = await gradeScript(runScript, problem, dialect, schema, sql);
@@ -186,7 +200,7 @@ export function Workspace({ problem, schema, mode = "practice", nav: setNav, ski
       return;
     }
     try {
-      const result = await execute(sql);
+      const result = await execute(activeSql);
       const expected = problem.expected;
       if (expected && expected.rows.length) {
         const cmp = compareResult(expected, result);
@@ -202,7 +216,7 @@ export function Workspace({ problem, schema, mode = "practice", nav: setNav, ski
       setRunning(false);
       setTab("result");
     }
-  }, [sql, running, execute, runScript, problem, schema, dialect, update, onGraded]);
+  }, [sql, activeSql, blankOn, running, execute, runScript, problem, schema, dialect, update, onGraded]);
 
   const highlight = useMemo(() => {
     const map = new Map<number, "extra" | "missing">();
@@ -245,7 +259,11 @@ export function Workspace({ problem, schema, mode = "practice", nav: setNav, ski
 
   const editor = (
     <div className={`${CODE_BOX} ${desktop ? "h-[min(22rem,44vh)] min-h-[13rem] shrink-0" : "h-[min(55dvh,26rem)] min-h-[15rem]"}`}>
-      <SqlEditor value={sql} onChange={setSql} dialect={dialect} onRun={onRun} schema={schema} prewritten={problem.script ? problem.starterSql?.[dialect] : undefined} />
+      {blankOn && blankSplit ? (
+        <BlankEditor key={`${problem.id}:${dialect}`} split={blankSplit} onChange={setBlankSql} onRun={onRun} />
+      ) : (
+        <SqlEditor value={sql} onChange={setSql} dialect={dialect} onRun={onRun} schema={schema} prewritten={problem.script ? problem.starterSql?.[dialect] : undefined} />
+      )}
     </div>
   );
 
@@ -350,8 +368,21 @@ export function Workspace({ problem, schema, mode = "practice", nav: setNav, ski
     <div className="flex flex-wrap items-center gap-3">
       <DialectSelector value={dialect} onChange={changeDialect} status={status} />
       <div className="ml-auto flex items-center gap-2">
-        {resetButton}
-        <Button size="sm" onClick={onRun} disabled={running || status.state !== "ready" || !sql.trim()}>
+        {blankSplit && (
+          <Button
+            size="sm"
+            tone="ghost"
+            aria-pressed={blankOn}
+            onClick={() => {
+              setBlankSql("");
+              setBlankPick(!blankOn);
+            }}
+          >
+            {blankOn ? "직접 작성" : "빈칸 채우기"}
+          </Button>
+        )}
+        {!blankOn && resetButton}
+        <Button size="sm" onClick={onRun} disabled={running || status.state !== "ready" || !activeSql.trim()}>
           <Icon name="play" size={16} filled />
           {running ? "실행 중" : "실행"}
           <span className="rounded-[5px] bg-white/20 px-[5px] py-[3px] font-mono text-[11px] leading-none opacity-80">⌘↩</span>

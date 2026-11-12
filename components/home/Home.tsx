@@ -11,7 +11,7 @@ import { FORMAT_ICON } from "@/components/ui/icons";
 import { DIFFICULTY_LABEL, FORMAT_LABEL } from "@/lib/content/types";
 import { usePath, type PathSet } from "@/lib/path";
 import { useProgressStore } from "@/lib/progress";
-import { dueSkills, nextInSkill, useSkillStore, type SkillProblem, type SkillView } from "@/lib/skills";
+import { dueSkills, nextInSkill, skillProblemHref, useSkillStore, type SkillProblem, type SkillView } from "@/lib/skills";
 import { ResumeRow } from "./ResumeList";
 import { WeekStrip, type WeekDay } from "./WeekStrip";
 
@@ -53,9 +53,10 @@ const MAX_REVIEW = 3;
 
 /** 복습할 유형 한 줄. 그 유형에서 다음에 풀 문제로 이동한다 */
 function ReviewRow({ skill, problem }: { skill: SkillView; problem: SkillProblem }) {
+  const progress = useProgressStore();
   return (
     <Link
-      href={`/problems/${problem.id}?skill=${skill.id}`}
+      href={skillProblemHref(skill.id, problem, progress)}
       className={`${SHELF_CLASS[skill.shelf]} flex items-center gap-3.5 rounded-[18px] bg-surface px-3.5 py-[13px] shadow-[inset_0_0_0_1.5px_var(--color-line),0_3px_0_var(--color-line)] dark:shadow-[inset_0_0_0_1px_var(--color-line)]`}
     >
       <span className="hq-catfill grid size-[46px] shrink-0 place-items-center rounded-[14px]">

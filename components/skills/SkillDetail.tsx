@@ -8,7 +8,7 @@ import { FORMAT_ICON, Icon } from "@/components/ui/icons";
 import { DIALECT_LABEL, DIFFICULTY_LABEL, FORMAT_LABEL, SKILL_SHELF_LABEL, UI_DIALECTS, type Difficulty, type SyntaxRef } from "@/lib/content/types";
 import { useNow } from "@/lib/daily/store";
 import { useProgressStore } from "@/lib/progress";
-import { nextInSkill, problemState, useSkillStore, type ProblemState, type SkillView } from "@/lib/skills";
+import { nextInSkill, problemState, skillProblemHref, useSkillStore, type ProblemState, type SkillView } from "@/lib/skills";
 import { SHELF_CLASS } from "./shelf";
 
 const LEVELS: Difficulty[] = ["basic", "intermediate", "advanced"];
@@ -55,7 +55,7 @@ export function SkillDetail({ skill, syntax }: { skill: SkillView; syntax: Synta
       )}
       {next && (
         <div className="mt-4">
-          <Button href={`/problems/${next.id}?skill=${skill.id}`} full>
+          <Button href={skillProblemHref(skill.id, next, progress)} full>
             {due ? "복습하기" : started ? "이어서 풀기" : "시작하기"}
           </Button>
         </div>

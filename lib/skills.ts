@@ -12,6 +12,8 @@ export interface SkillProblem {
   timeLimitMin: number | null;
   /** 이 유형이 문제의 대표 유형(skills[0])이면 true */
   primary: boolean;
+  /** 빈칸 채우기를 할 수 있는 문제 */
+  blanks: boolean;
 }
 
 export interface SkillView {
@@ -116,6 +118,10 @@ export const nextInSkill = (problems: SkillProblem[], progress: Record<string, P
   });
   return ranked[0] ?? null;
 };
+
+/** 유형에서 문제를 여는 주소. 이미 통과한 문제를 다시 풀 때는 빈칸 채우기로 연다 */
+export const skillProblemHref = (skillId: string, problem: SkillProblem, progress: Record<string, ProblemProgress>): string =>
+  `/problems/${problem.id}?skill=${skillId}${problem.blanks && progress[problem.id]?.passed ? "&mode=blank" : ""}`;
 
 /** 복습 시각이 지난 유형을 오래 밀린 순으로 */
 export const dueSkills = (skills: SkillView[], store: Store, now: number): SkillView[] =>

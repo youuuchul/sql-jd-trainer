@@ -216,6 +216,8 @@ export const ProblemSchema = z.object({
   spot: SpotSchema.optional(),
   review: ReviewSchema.optional(),
   script: ScriptSchema.optional(),
+  /** 빈칸 채우기 복습에서 가릴 글. 방언별 정답 쿼리에 정확히 한 번씩 나와야 한다 */
+  blanks: z.partialRecord(DialectSchema, z.array(z.string())).optional(),
   explanation: z.string().default(""),
   dialectNotes: z.partialRecord(DialectSchema, z.string()).optional(),
   choices: z

@@ -11,6 +11,7 @@ import path from "node:path";
 import { loadEnvConfig } from "@next/env";
 import { neon } from "@neondatabase/serverless";
 import { CardDeckSchema, DIALECTS, ProblemSchema, ProblemSetSchema, SchemaDefSchema, SkillSchema, SyntaxRefSchema, type SchemaDef } from "../lib/content/types";
+import { splitBlanks } from "../lib/grading/blanks";
 import { checkScriptProblem } from "../lib/grading/script-check";
 
 loadEnvConfig(process.cwd(), true);
@@ -52,6 +53,12 @@ const collect = (): Row[] => {
         for (const ref of [...p.review.defects, ...p.review.decoys])
           if ((!ref.dialects || ref.dialects.includes(d)) && !ref.lines[d]?.length) throw new Error(`${file}: review 줄(${ref.match[0]})이 ${d} 에서 풀리지 않았습니다.`);
       }
+    }
+    for (const d of DIALECTS) {
+      const tokens = p.blanks?.[d];
+      if (!tokens) continue;
+      const solution = p.solutions?.[d];
+      if (p.script || !solution || !splitBlanks(solution, tokens)) throw new Error(`${file}: blanks.${d} 가 정답 쿼리에 한 번씩 나오지 않거나 겹칩니다.`);
     }
     if (problemIds.has(p.id)) throw new Error(`${file}: 문제 id 중복 ${p.id}`);
     problemIds.add(p.id);
