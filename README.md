@@ -50,9 +50,9 @@ npm run typecheck
 - `KV_REST_API_URL`, `KV_REST_API_TOKEN`: 알림 구독 저장소(Upstash Redis, Vercel Marketplace 연결 시 자동 추가)
 - `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`: Web Push 키. `npx web-push generate-vapid-keys` 로 만든다
 - `CRON_SECRET`: Vercel Cron 이 `/api/cron/daily-push` 를, 게시 스크립트가 `/api/content/revalidate` 를 부를 때 쓰는 비밀값
-- `MYSQL_URL`, `MYSQL_SSL`, `NEXT_PUBLIC_MYSQL`: 아래 MySQL 모드
+- `MYSQL_URL`, `MYSQL_SSL`, `MYSQL_CA`, `NEXT_PUBLIC_MYSQL`: 아래 MySQL 모드
 
-MySQL 모드를 로컬에서 쓰려면 환경변수 `MYSQL_URL`(예: `mysql://user:pass@host:3306/`)을 주고 실행한다. TLS가 필요한 호스팅(TiDB Serverless 등)은 `MYSQL_SSL=1`을 추가한다. 화면의 방언 선택에 MySQL 을 보이려면 `NEXT_PUBLIC_MYSQL=1` 을 함께 준다(빌드 시점 값). 없으면 MySQL 은 화면에 나오지 않고 나머지 두 방언은 정상 동작한다.
+MySQL 모드를 로컬에서 쓰려면 환경변수 `MYSQL_URL`(예: `mysql://user:pass@host:3306/`)을 주고 실행한다. TLS가 필요한 호스팅(TiDB Serverless 등)은 `MYSQL_SSL=1`을 추가한다. 자체 인증 기관을 쓰는 호스팅(Aiven 등)은 CA 인증서(PEM)를 `MYSQL_CA` 에 넣는다. 화면의 방언 선택에 MySQL 을 보이려면 `NEXT_PUBLIC_MYSQL=1` 을 함께 준다(빌드 시점 값). 없으면 MySQL 은 화면에 나오지 않고 나머지 두 방언은 정상 동작한다.
 
 로컬 검증용 MySQL:
 

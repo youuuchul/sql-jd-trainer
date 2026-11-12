@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { splitBlanks } from "../lib/grading/blanks";
 import { problem, problems, set } from "./content";
 
 const SKILL = "b-null";
@@ -99,14 +100,16 @@ test("빈칸 채우기: 가린 자리를 채워 실행하면 결과로 채점하
   await page.goto(`/problems/${p.id}?mode=blank`);
   await expect(page.getByText("준비됨")).toBeVisible({ timeout: 90_000 });
   const blanks = page.getByRole("textbox", { name: /^빈칸 \d+$/ });
-  await expect(blanks).toHaveCount(p.blanks!.postgres!.length);
+  const { answers } = splitBlanks(p.solutions!.postgres!, p.blanks!.postgres!)!;
+  const cond = answers.indexOf("<= 2");
+  expect(cond).toBeGreaterThan(-1);
+  await expect(blanks).toHaveCount(answers.length);
   await expect(page.getByRole("button", { name: /실행/ })).toBeDisabled();
-  await blanks.nth(0).fill("< 2");
-  await blanks.nth(1).fill("rating, review_id");
+  for (const [i, a] of answers.entries()) await blanks.nth(i).fill(i === cond ? "< 2" : a);
   await page.getByRole("button", { name: /실행/ }).click();
   await expect(page.getByText("오답", { exact: true })).toBeVisible();
   // 정답과 글자가 달라도 결과가 같으면 통과
-  await blanks.nth(0).fill("< 3");
+  await blanks.nth(cond).fill("< 3");
   await page.getByRole("button", { name: /실행/ }).click();
   await expect(page.getByText("정답", { exact: true })).toBeVisible();
   expect(await page.evaluate((id) => (JSON.parse(localStorage.getItem("sjt:progress:v1") ?? "{}") as Record<string, { sql: Record<string, string> }>)[id]?.sql.postgres, p.id)).toBeUndefined();

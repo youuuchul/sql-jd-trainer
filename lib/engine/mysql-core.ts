@@ -16,8 +16,11 @@ const getPool = (): Pool => {
   if (pool) return pool;
   const url = process.env.MYSQL_URL;
   if (!url) throw new Error("MYSQL_URL이 설정되지 않았습니다.");
+  // 호스팅이 주는 주소의 ssl-mode 같은 질의는 드라이버가 모르는 옵션이라 뗀다. TLS 는 MYSQL_SSL 로 켠다
+  const uri = new URL(url);
+  uri.search = "";
   pool = mysql.createPool({
-    uri: url,
+    uri: uri.toString(),
     connectionLimit: 3,
     multipleStatements: false,
     dateStrings: true,
@@ -25,7 +28,8 @@ const getPool = (): Pool => {
     supportBigNumbers: true,
     bigNumberStrings: false,
     rowsAsArray: true,
-    ssl: process.env.MYSQL_SSL === "1" ? { minVersion: "TLSv1.2", rejectUnauthorized: true } : undefined,
+    // MYSQL_CA: 자체 인증 기관을 쓰는 호스팅(Aiven 등)의 CA 인증서(PEM). 없으면 공인 인증 기관만 믿는다
+    ssl: process.env.MYSQL_SSL === "1" ? { minVersion: "TLSv1.2", rejectUnauthorized: true, ca: process.env.MYSQL_CA || undefined } : undefined,
   });
   return pool;
 };
