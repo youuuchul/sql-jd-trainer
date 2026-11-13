@@ -1,6 +1,6 @@
 import "server-only";
 import type { PathProblem, PathSet } from "@/lib/path";
-import { listProblems, listSchemas, listSets } from "./loader";
+import { listProblemMeta, listSchemaMeta, listSets } from "./loader";
 import { SetCategorySchema } from "./types";
 
 /**
@@ -14,7 +14,7 @@ import { SetCategorySchema } from "./types";
  *   화면에 필요한 필드만 담은 세트 목록.
  */
 export const listPathSets = async ({ unlocked = false }: { unlocked?: boolean } = {}): Promise<PathSet[]> => {
-  const [sets, schemas, problems] = await Promise.all([listSets(), listSchemas(), listProblems()]);
+  const [sets, schemas, problems] = await Promise.all([listSets(), listSchemaMeta(), listProblemMeta()]);
   const schemaById = new Map(schemas.map((s) => [s.id, s]));
   const problemById = new Map(problems.map((p) => [p.id, p]));
   const rank = (c: string) => SetCategorySchema.options.indexOf(c as (typeof SetCategorySchema.options)[number]);
@@ -27,7 +27,7 @@ export const listPathSets = async ({ unlocked = false }: { unlocked?: boolean } 
         ? []
         : s.problems.flatMap((id) => {
             const p = problemById.get(id);
-            return p ? [{ id: p.id, title: p.title, format: p.format, difficulty: p.difficulty, sourceType: p.sourceType, timeLimitMin: p.timeLimitMin ?? null, tags: p.tags }] : [];
+            return p ? [{ id: p.id, title: p.title, format: p.format, difficulty: p.difficulty, sourceType: p.sourceType, timeLimitMin: p.timeLimitMin, tags: p.tags }] : [];
           });
       return {
         id: s.id,

@@ -1,6 +1,6 @@
 import "server-only";
 import type { SkillView } from "@/lib/skills";
-import { listDecks, listProblems, listSchemas, listSkills } from "./loader";
+import { listDecks, listProblemMeta, listSchemaMeta, listSkills } from "./loader";
 import { isShown } from "@/lib/daily/srs";
 import type { Difficulty } from "./types";
 
@@ -13,7 +13,7 @@ const DIFF_RANK: Record<Difficulty, number> = { basic: 0, intermediate: 1, advan
  *   선반(패턴 → 함수 → 기초 문법)과 order 순의 유형 목록.
  */
 export const listSkillViews = async (): Promise<SkillView[]> => {
-  const [skills, problems, schemas, decks] = await Promise.all([listSkills(), listProblems(), listSchemas(), listDecks()]);
+  const [skills, problems, schemas, decks] = await Promise.all([listSkills(), listProblemMeta(), listSchemaMeta(), listDecks()]);
   const locked = new Set(schemas.filter((s) => s.locked).map((s) => s.id));
   const open = problems.filter((p) => !locked.has(p.schema));
   const cards = decks.flatMap((d) => d.cards).filter(isShown);
@@ -26,6 +26,6 @@ export const listSkillViews = async (): Promise<SkillView[]> => {
     problems: open
       .filter((p) => p.skills.includes(s.id))
       .sort((a, b) => DIFF_RANK[a.difficulty] - DIFF_RANK[b.difficulty] || Number(b.skills[0] === s.id) - Number(a.skills[0] === s.id) || a.id.localeCompare(b.id))
-      .map((p) => ({ id: p.id, title: p.title, difficulty: p.difficulty, format: p.format, timeLimitMin: p.timeLimitMin ?? null, primary: p.skills[0] === s.id, blanks: Boolean(p.blanks && !p.script) })),
+      .map((p) => ({ id: p.id, title: p.title, difficulty: p.difficulty, format: p.format, timeLimitMin: p.timeLimitMin, primary: p.skills[0] === s.id, blanks: p.blanks })),
   }));
 };
