@@ -52,6 +52,8 @@ export const ensureSchema = (schema: SchemaDef): Promise<void> => {
       await conn.query("SET SESSION TRANSACTION READ WRITE");
       await conn.query(`CREATE DATABASE IF NOT EXISTS \`${db}\``);
       await conn.changeUser({ database: db });
+      // 시드 테이블에는 기본 키가 없다. 기본 키를 요구하는 호스팅(Aiven)에서도 만들 수 있게 세션에서만 끈다
+      await conn.query("SET SESSION sql_require_primary_key = 0");
       await conn.query(`CREATE TABLE IF NOT EXISTS \`${META_TABLE}\` (schema_id VARCHAR(64) PRIMARY KEY, version VARCHAR(32) NOT NULL)`);
       const [rows] = await conn.query<mysql.RowDataPacket[]>(`SELECT version FROM \`${META_TABLE}\` WHERE schema_id = ?`, [schema.id]);
       const current = (rows[0] as unknown as [string] | undefined)?.[0];
