@@ -60,6 +60,13 @@ export function SkillDetail({ skill, syntax }: { skill: SkillView; syntax: Synta
           </Button>
         </div>
       )}
+      {skill.cardCount > 0 && (
+        <div className="mt-2.5">
+          <Button href={`/skills/${skill.id}/cards`} tone="ghost" full>
+            카드 {skill.cardCount}장 풀기
+          </Button>
+        </div>
+      )}
       {LEVELS.map((level) => {
         const items = skill.problems.filter((p) => p.difficulty === level);
         if (!items.length) return null;

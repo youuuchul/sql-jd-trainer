@@ -1,4 +1,7 @@
+import { readdirSync, readFileSync } from "node:fs";
+import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
+import type { Card } from "../lib/content/types";
 import { splitBlanks } from "../lib/grading/blanks";
 import { problem, problems, set } from "./content";
 
@@ -147,4 +150,29 @@ test("MySQL: 화면에서 MySQL 을 골라 숙박 예약 문제를 채점한다"
   await expect(page.getByRole("radio", { name: "MySQL" })).toBeChecked();
   const blanks = page.getByRole("textbox", { name: /^빈칸 \d+$/ });
   await expect(blanks).toHaveCount(p.blanks!.mysql!.length);
+});
+
+test("유형 카드: 그 유형의 카드만 복습할 카드부터 나오고, 풀면 카드 기록에 남고, 그만하면 유형으로 돌아온다", async ({ page }) => {
+  const skill = (JSON.parse(readFileSync("content/skills/skills.json", "utf-8")) as { id: string; syntax: string[] }[]).find((s) => s.id === "f-rank")!;
+  const cards = readdirSync("content/cards")
+    .flatMap((f) => (JSON.parse(readFileSync(path.join("content/cards", f), "utf-8")) as { cards: Card[] }).cards)
+    .filter((c) => c.dialect !== "mysql" && c.syntax.some((id) => skill.syntax.includes(id)));
+  const due = cards[cards.length - 1];
+  await page.addInitScript((id) => {
+    if (localStorage.getItem("sjt:daily:v1")) return;
+    localStorage.setItem("sjt:daily:v1", JSON.stringify({ cards: { [id]: { box: 1, due: 1, reps: 1, lapses: 0, lastAt: 0 } }, days: {}, settings: { goal: 5, dialect: "all" } }));
+  }, due.id);
+  await page.goto(`/skills/${skill.id}`);
+  await page.getByRole("link", { name: `카드 ${cards.length}장 풀기` }).click();
+  await expect(page).toHaveURL(new RegExp(`/skills/${skill.id}/cards$`));
+  await expect(page.getByRole("progressbar")).toHaveAttribute("aria-valuemax", String(cards.length));
+  await expect(page.locator("article h2").first()).toHaveText(due.prompt);
+  await page.getByLabel("빈칸").fill(due.answers[0]);
+  await page.getByRole("button", { name: "확인" }).click();
+  await expect(page.getByText("정답", { exact: true })).toBeVisible();
+  expect(await page.evaluate((id) => (JSON.parse(localStorage.getItem("sjt:daily:v1")!) as { cards: Record<string, { box: number }> }).cards[id].box, due.id)).toBe(2);
+  await page.getByRole("button", { name: "계속" }).click();
+  await expect(page.locator("article h2").first()).not.toHaveText(due.prompt);
+  await page.getByRole("button", { name: "그만하기" }).click();
+  await expect(page).toHaveURL(new RegExp(`/skills/${skill.id}$`));
 });

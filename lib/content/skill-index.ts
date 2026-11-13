@@ -1,6 +1,7 @@
 import "server-only";
 import type { SkillView } from "@/lib/skills";
 import { listDecks, listProblems, listSchemas, listSkills } from "./loader";
+import { isShown } from "@/lib/daily/srs";
 import type { Difficulty } from "./types";
 
 const DIFF_RANK: Record<Difficulty, number> = { basic: 0, intermediate: 1, advanced: 2 };
@@ -15,7 +16,7 @@ export const listSkillViews = async (): Promise<SkillView[]> => {
   const [skills, problems, schemas, decks] = await Promise.all([listSkills(), listProblems(), listSchemas(), listDecks()]);
   const locked = new Set(schemas.filter((s) => s.locked).map((s) => s.id));
   const open = problems.filter((p) => !locked.has(p.schema));
-  const cards = decks.flatMap((d) => d.cards);
+  const cards = decks.flatMap((d) => d.cards).filter(isShown);
   return skills.map((s) => ({
     id: s.id,
     shelf: s.shelf,
