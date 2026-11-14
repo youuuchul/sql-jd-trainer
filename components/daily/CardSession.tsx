@@ -97,15 +97,27 @@ function ResultTable({ result, className }: { result: NonNullable<Card["result"]
   );
 }
 
-/** 화면 키보드가 가린 높이(px). 키보드가 없으면 0 */
-const useKeyboardInset = (): number => {
-  const [inset, setInset] = useState(0);
+/**
+ * 화면 키보드가 올라와 있는지와, 아래 고정 줄을 키보드 바로 위에 붙이려면 띄워야 하는 높이(px).
+ * 키보드가 보이는 영역만 줄이는 브라우저(iOS)는 그 높이만큼 띄우고, 화면 자체를 줄이는 브라우저는 0 이다
+ */
+const useKeyboardInset = (): { open: boolean; bottom: number } => {
+  const [inset, setInset] = useState({ open: false, bottom: 0 });
   useEffect(() => {
     const vv = window.visualViewport;
     if (!vv) return;
+    // 키보드가 없을 때의 보이는 높이. 화면을 돌리면 다시 잰다
+    let full = vv.height;
+    let width = vv.width;
     const update = () => {
-      const hidden = window.innerHeight - vv.height - vv.offsetTop;
-      setInset(hidden > 80 ? Math.round(hidden) : 0);
+      if (vv.width !== width) {
+        width = vv.width;
+        full = vv.height;
+      }
+      full = Math.max(full, vv.height);
+      const open = full - vv.height > 80;
+      const bottom = open ? Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop)) : 0;
+      setInset((prev) => (prev.open === open && prev.bottom === bottom ? prev : { open, bottom }));
     };
     update();
     vv.addEventListener("resize", update);
@@ -148,6 +160,14 @@ export function CardSession({ queue: initial, syntax, dialectFilter, onAnswer, o
     if (finish) actionRef.current?.querySelector("button")?.focus({ preventScroll: true });
     else inputRef.current?.focus();
   }, [finish, pos, found]);
+
+  useEffect(() => {
+    // 키보드가 올라오면 입력 중인 빈칸이 키보드와 아래 줄에 가리지 않게 화면 가운데로 옮긴다
+    const blank = document.querySelector("article [data-blank]");
+    const vv = window.visualViewport;
+    if (!keyboard.open || !blank || !vv) return;
+    window.scrollBy({ top: blank.getBoundingClientRect().top - vv.offsetTop - (vv.height - 76) / 2, behavior: "smooth" });
+  }, [keyboard.open, pos]);
 
   if (!card) return null;
   const answer = card.answers[0];
@@ -266,7 +286,7 @@ export function CardSession({ queue: initial, syntax, dialectFilter, onAnswer, o
             : "";
 
   return (
-    <div className="mx-auto flex w-full max-w-lg flex-1 flex-col px-4 pt-3 pb-6 lg:pt-8" style={keyboard > 0 && !finish ? { paddingBottom: keyboard + 76 } : undefined}>
+    <div className="mx-auto flex w-full max-w-lg flex-1 flex-col px-4 pt-3 pb-6 lg:pt-8" style={keyboard.open && !finish ? { paddingBottom: keyboard.bottom + 76 } : undefined}>
       <div className="flex h-14 items-center gap-3.5 lg:h-12">
         <button type="button" onClick={leave} aria-label="그만하기" className="-ml-1 inline-flex h-10 w-10 items-center justify-center rounded-xl text-muted hover:bg-surface-2 hover:text-fg">
           <Icon name="x" size={26} />
@@ -375,8 +395,8 @@ export function CardSession({ queue: initial, syntax, dialectFilter, onAnswer, o
 
       {!finish && (
         <div
-          className={keyboard > 0 ? "fixed inset-x-0 z-30 mx-auto flex w-full max-w-lg gap-2 bg-bg px-4 py-2.5 shadow-[0_-1px_0_var(--color-line)]" : "mt-auto flex gap-2 pt-6"}
-          style={keyboard > 0 ? { bottom: keyboard } : undefined}
+          className={keyboard.open ? "fixed inset-x-0 z-30 mx-auto flex w-full max-w-lg gap-2 bg-bg px-4 py-2.5 shadow-[0_-1px_0_var(--color-line)]" : "mt-auto flex gap-2 pt-6"}
+          style={keyboard.open ? { bottom: keyboard.bottom } : undefined}
         >
           {hintStep === 3 || (hintStep === 2 && !canFirstLetter) ? (
             <Button tone="ghost" size="sm" onClick={() => complete("wrong", true)}>
