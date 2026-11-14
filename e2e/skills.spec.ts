@@ -156,7 +156,7 @@ test("유형 카드: 그 유형의 카드만 복습할 카드부터 나오고, �
   const skill = (JSON.parse(readFileSync("content/skills/skills.json", "utf-8")) as { id: string; syntax: string[] }[]).find((s) => s.id === "f-rank")!;
   const cards = readdirSync("content/cards")
     .flatMap((f) => (JSON.parse(readFileSync(path.join("content/cards", f), "utf-8")) as { cards: Card[] }).cards)
-    .filter((c) => c.dialect !== "mysql" && c.syntax.some((id) => skill.syntax.includes(id)));
+    .filter((c) => !c.extra && c.dialect !== "mysql" && c.syntax.some((id) => skill.syntax.includes(id)));
   const due = cards[cards.length - 1];
   await page.addInitScript((id) => {
     if (localStorage.getItem("sjt:daily:v1")) return;

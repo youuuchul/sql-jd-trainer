@@ -83,15 +83,27 @@ const pieces = (text: string, blank: ReactNode): ReactNode =>
     </Fragment>
   ));
 
-/** 카드 코드. template 의 ___ 자리에 blank 를 끼우고, 줄이 길어지면 들여쓰기를 유지한 채 줄을 바꾼다 */
-export function CardCode({ template, blank }: { template: string; blank: ReactNode }) {
+/**
+ * 카드 코드. template 의 ___ 자리에 blank 를 끼우고, 줄이 길어지면 들여쓰기를 유지한 채 줄을 바꾼다.
+ * onPickLine 을 주면 줄을 눌러 고를 수 있고, missed 에 든 줄은 이미 골랐다가 틀린 줄로 흐리게 보인다
+ */
+export function CardCode({ template, blank, onPickLine, missed }: { template: string; blank: ReactNode; onPickLine?: (line: number) => void; missed?: number[] }) {
   const lines = template.replace(BLANK, SENTINEL).split("\n");
   return (
     <div className="font-mono text-[13.5px] leading-[1.9] text-code-fg">
       {lines.map((line, li) => {
         const indent = line.length - line.trimStart().length;
         return (
-          <div key={li} className="break-words whitespace-pre-wrap" style={{ paddingLeft: `${indent}ch`, textIndent: `-${indent}ch` }}>
+          <div
+            key={li}
+            role={onPickLine ? "button" : undefined}
+            tabIndex={onPickLine ? 0 : undefined}
+            data-line={onPickLine ? li : undefined}
+            onClick={onPickLine ? () => onPickLine(li) : undefined}
+            onKeyDown={onPickLine ? (e) => e.key === "Enter" && onPickLine(li) : undefined}
+            className={`break-words whitespace-pre-wrap ${onPickLine ? "-mx-1.5 cursor-pointer rounded-md px-1.5 hover:bg-surface-2 focus-visible:bg-surface-2" : ""} ${missed?.includes(li) ? "opacity-40" : ""}`}
+            style={{ paddingLeft: `calc(${indent}ch + ${onPickLine ? "0.375rem" : "0px"})`, textIndent: `-${indent}ch` }}
+          >
             {tokenize(line).map((t, ti) => (
               <span key={ti} className={KIND_CLASS[t.kind]}>
                 {pieces(t.text, blank)}

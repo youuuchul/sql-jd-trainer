@@ -97,7 +97,40 @@ const main = async () => {
       }
       if (ok && base) lines.push(`${card.id.padEnd(32)} ${dialects.join(",")} 일치 ${JSON.stringify(base.rows[0])}`);
       const cardRaw = raw.cards.find((c: { id: string }) => c.id === card.id);
-      outCards.push(base ? { ...cardRaw, result: { columns: base.columns, rows: base.rows } } : cardRaw);
+      const steps = [];
+      for (const step of card.steps ?? []) {
+        let first: QueryResult | null = null;
+        for (const d of dialects) {
+          const res = await run(d, step.sql);
+          if (res instanceof Error) {
+            fail(`${d} 중간 과정 "${step.label}" 실패: ${res.message.split("\n")[0].slice(0, 120)}`);
+            continue;
+          }
+          if (res.rows.length === 0 || res.rows.length > 12) fail(`${d} 중간 과정 "${step.label}" ${res.rows.length}행 (1~12행이어야 함)`);
+          if (!first) {
+            first = res;
+            continue;
+          }
+          const cmp = compareResult({ columns: first.columns, rows: first.rows, ordered: true, tolerance: 0.0001, checkColumnNames: false }, res);
+          if (!cmp.pass) fail(`${d} 중간 과정 "${step.label}" 결과가 다름`);
+        }
+        steps.push(first ? { label: step.label, sql: step.sql, result: { columns: first.columns, rows: first.rows } } : { label: step.label, sql: step.sql });
+      }
+      let bugResult: QueryResult | null = null;
+      if (card.bug !== undefined && base) {
+        for (const d of dialects) {
+          const res = await run(d, card.template.replace(BLANK, card.bug));
+          if (res instanceof Error) {
+            fail(`${d} 틀린 쿼리 실패: ${res.message.split("\n")[0].slice(0, 120)}`);
+            continue;
+          }
+          if (compareResult({ columns: base.columns, rows: base.rows, ordered: true, tolerance: 0.0001, checkColumnNames: false }, res).pass) fail(`${d} 틀린 쿼리의 결과가 정답과 같음`);
+          bugResult ??= res;
+        }
+      }
+      const built = base ? { ...cardRaw, result: { columns: base.columns, rows: base.rows } } : cardRaw;
+      const withBug = bugResult ? { ...built, bugResult: { columns: bugResult.columns, rows: bugResult.rows } } : built;
+      outCards.push(steps.length ? { ...withBug, steps } : withBug);
     }
     writeFileSync(file, JSON.stringify({ ...raw, cards: outCards }, null, 2) + "\n");
   }

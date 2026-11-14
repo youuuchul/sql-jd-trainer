@@ -59,7 +59,7 @@ const DIALECT_TONE: Record<string, string> = {
 const formsFor = (ref: SyntaxRef, cardDialect: Card["dialect"], filter: DialectFilter) => {
   const rank = (d: string) => (d === cardDialect ? 0 : d === "common" ? 1 : 2);
   return ref.forms
-    .filter((f) => (f.dialect === "common" || UI_DIALECTS.includes(f.dialect)) && (filter === "all" || f.dialect === "common" || f.dialect === filter || f.dialect === cardDialect))
+    .filter((f) => f.dialect === "common" || f.dialect === cardDialect || (UI_DIALECTS.includes(f.dialect) && (f.dialect === filter || (filter === "all" && cardDialect === "common"))))
     .sort((a, b) => rank(a.dialect) - rank(b.dialect));
 };
 
@@ -123,14 +123,17 @@ export function CardSession({ queue: initial, syntax, dialectFilter, onAnswer, o
   const [queue, setQueue] = useState(initial);
   const [pos, setPos] = useState(0);
   const [input, setInput] = useState("");
-  /** 0 없음, 1 뜻 힌트(말 설명·함수 뜻), 2 첫 글자. 정답이 짧으면 첫 글자를 건너뛴다 */
-  const [hintStep, setHintStep] = useState<0 | 1 | 2>(0);
+  /** 0 없음, 1 짧은 힌트, 2 추가 설명, 3 첫 글자. 정답이 짧으면 첫 글자를 건너뛴다 */
+  const [hintStep, setHintStep] = useState<0 | 1 | 2 | 3>(0);
   const [focused, setFocused] = useState(false);
   /** 지금 입력이 오답으로 표시된 상태. 입력을 고치면 풀린다 */
   const [marked, setMarked] = useState(false);
   const [wrongCount, setWrongCount] = useState(0);
   const [lastWrong, setLastWrong] = useState<{ text: string; near: number | null } | null>(null);
   const [finish, setFinish] = useState<Finish | null>(null);
+  /** 틀린 줄 찾기 카드에서 틀린 줄을 맞게 골랐는지, 잘못 고른 줄은 무엇인지 */
+  const [found, setFound] = useState(false);
+  const [missed, setMissed] = useState<number[]>([]);
   const [results, setResults] = useState<SessionResult[]>([]);
   const states = useRef(new Map<string, CardState | undefined>());
   const inputRef = useRef<HTMLInputElement>(null);
@@ -144,13 +147,25 @@ export function CardSession({ queue: initial, syntax, dialectFilter, onAnswer, o
     // 결과 아래 해설·문법을 읽도록 계속 버튼으로 화면을 내리지 않는다
     if (finish) actionRef.current?.querySelector("button")?.focus({ preventScroll: true });
     else inputRef.current?.focus();
-  }, [finish, pos]);
+  }, [finish, pos, found]);
 
   if (!card) return null;
   const answer = card.answers[0];
   const hint = hintStep > 0;
   const canFirstLetter = answer.length >= FIRST_LETTER_MIN_LEN;
   const refs = card.syntax.map((id) => syntax[id]).filter((r): r is SyntaxRef => r !== undefined);
+  const spotting = card.bug !== undefined && !found && !finish;
+  const bugLine = card.template.split("\n").findIndex((l) => l.includes("___"));
+
+  const pickLine = (line: number) => {
+    if (line === bugLine) {
+      setFound(true);
+      return;
+    }
+    if (missed.includes(line)) return;
+    setMissed((m) => [...m, line]);
+    setWrongCount((n) => n + 1);
+  };
 
   const complete = (outcome: Outcome, gaveUp: boolean) => {
     if (finish) return;
@@ -205,6 +220,8 @@ export function CardSession({ queue: initial, syntax, dialectFilter, onAnswer, o
     setWrongCount(0);
     setLastWrong(null);
     setFinish(null);
+    setFound(false);
+    setMissed([]);
   };
 
   const onKey = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -268,8 +285,9 @@ export function CardSession({ queue: initial, syntax, dialectFilter, onAnswer, o
         <div className="mx-0.5 flex h-[26px] items-center gap-2 text-[13px] font-semibold text-muted">
           <span className="truncate">{card.deckTitle}</span>
           <span className={`shrink-0 ${DIALECT_TONE[card.dialect]}`}>{card.dialect === "common" ? "공통" : DIALECT_LABEL[card.dialect]}</span>
-          {card.kind && <span className="shrink-0">{KIND_LABEL[card.kind]}</span>}
+          {card.kind && card.bug === undefined && <span className="shrink-0">{KIND_LABEL[card.kind]}</span>}
           {card.level === "applied" && <span className="shrink-0">응용</span>}
+          {card.bug !== undefined && <span className="shrink-0">틀린 줄 찾기</span>}
           <span className="ml-auto shrink-0">{chip}</span>
         </div>
         <h2 className="mx-0.5 mt-2.5 mb-3.5 text-[21px] leading-[1.38] font-extrabold tracking-[-0.035em]">{card.prompt}</h2>
@@ -278,16 +296,17 @@ export function CardSession({ queue: initial, syntax, dialectFilter, onAnswer, o
             <Icon name="bulb" size={16} className="mt-0.5 shrink-0" />
             <div className="min-w-0">
               <p>{card.hint}</p>
-              {card.hintMore ? (
-                <p className="mt-1.5">{card.hintMore}</p>
-              ) : (
-                refs.map((ref) => (
-                  <p key={ref.id} className="mt-1.5 text-[13px] leading-snug">
-                    <b>{maskAnswers(ref.title, card.answers)}</b> {maskAnswers(ref.summary, card.answers)}
-                  </p>
-                ))
-              )}
-              {hintStep === 2 && (
+              {hintStep >= 2 &&
+                (card.hintMore ? (
+                  <p className="mt-1.5">{card.hintMore}</p>
+                ) : (
+                  refs.map((ref) => (
+                    <p key={ref.id} className="mt-1.5 text-[13px] leading-snug">
+                      <b>{maskAnswers(ref.title, card.answers)}</b> {maskAnswers(ref.summary, card.answers)}
+                    </p>
+                  ))
+                ))}
+              {hintStep === 3 && (
                 <p className="mt-1.5">
                   첫 글자 <b data-first-letter="" className="font-mono">{answer[0]}</b>
                 </p>
@@ -296,8 +315,12 @@ export function CardSession({ queue: initial, syntax, dialectFilter, onAnswer, o
           </Note>
         )}
         <div className="relative rounded-[14px] bg-code-bg p-3 shadow-[inset_0_0_0_1px_var(--color-line)]">
-          <CardCode template={card.template} blank={<Blank value={finish?.gaveUp ? answer : input} length={answer.length} state={blankState} focused={focused} />} />
-          {!finish && (
+          {spotting ? (
+            <CardCode template={card.template.replace("___", card.bug ?? "")} blank={null} onPickLine={pickLine} missed={missed} />
+          ) : (
+            <CardCode template={card.template} blank={<Blank value={finish?.gaveUp ? answer : input} length={answer.length} state={blankState} focused={focused} />} />
+          )}
+          {!finish && !spotting && (
             <input
               ref={inputRef}
               value={input}
@@ -318,9 +341,21 @@ export function CardSession({ queue: initial, syntax, dialectFilter, onAnswer, o
             />
           )}
         </div>
+        {spotting && missed.length > 0 && (
+          <p role="alert" className="mx-0.5 mt-3 flex items-center gap-1.5 text-[13.5px] font-semibold text-fail-ink">
+            <Icon name="xcircle" size={17} className="shrink-0 text-fail" />
+            고른 줄은 문제가 없어요
+          </p>
+        )}
+        {card.bugResult && !finish && (
+          <section aria-label="지금 결과" className="mt-2.5">
+            <p className="mx-0.5 mb-1 text-[12.5px] font-bold text-fail-ink">지금 결과</p>
+            <ResultTable result={card.bugResult} className="rounded-[14px] shadow-[inset_0_0_0_1px_var(--color-line)]" />
+          </section>
+        )}
         {card.result && !finish && (
           <section aria-label="실행 결과" className="mt-2.5">
-            <p className="mx-0.5 mb-1 text-[12.5px] font-bold text-muted">실행 결과</p>
+            <p className="mx-0.5 mb-1 text-[12.5px] font-bold text-muted">{card.bug !== undefined ? "나와야 하는 결과" : "실행 결과"}</p>
             <ResultTable result={card.result} className="rounded-[14px] shadow-[inset_0_0_0_1px_var(--color-line)]" />
           </section>
         )}
@@ -343,14 +378,19 @@ export function CardSession({ queue: initial, syntax, dialectFilter, onAnswer, o
           className={keyboard > 0 ? "fixed inset-x-0 z-30 mx-auto flex w-full max-w-lg gap-2 bg-bg px-4 py-2.5 shadow-[0_-1px_0_var(--color-line)]" : "mt-auto flex gap-2 pt-6"}
           style={keyboard > 0 ? { bottom: keyboard } : undefined}
         >
-          {hintStep === 2 || (hintStep === 1 && !canFirstLetter) ? (
+          {hintStep === 3 || (hintStep === 2 && !canFirstLetter) ? (
             <Button tone="ghost" size="sm" onClick={() => complete("wrong", true)}>
               정답 보기
+            </Button>
+          ) : hintStep === 2 ? (
+            <Button tone="ghost" size="sm" onClick={() => setHintStep(3)}>
+              <Icon name="bulb" size={18} />
+              첫 글자
             </Button>
           ) : hintStep === 1 ? (
             <Button tone="ghost" size="sm" onClick={() => setHintStep(2)}>
               <Icon name="bulb" size={18} />
-              첫 글자
+              힌트 더
             </Button>
           ) : (
             <Button tone="ghost" size="sm" onClick={() => setHintStep(1)}>
@@ -391,8 +431,25 @@ export function CardSession({ queue: initial, syntax, dialectFilter, onAnswer, o
           <div className="my-3.5">
             <ReviewLadder box={finish.box} tone={passTone ? "pass" : "fail"} />
           </div>
-          <Note>{card.explanation}</Note>
-          {card.result && <ResultTable result={card.result} className="mt-3 rounded-2xl bg-surface/70 dark:bg-bg/55" />}
+          <Note>
+            {card.word && <b className="mb-1 block">{card.word}</b>}
+            {card.explanation}
+          </Note>
+          {card.steps?.length ? (
+            <ol aria-label="중간 과정" className="mt-3 grid gap-2.5">
+              {card.steps.map((step, i) => (
+                <li key={i} className="rounded-2xl bg-surface/70 pt-2.5 dark:bg-bg/55">
+                  <p className="px-3.5 text-[12.5px] leading-snug font-bold">
+                    <span className="mr-1.5 text-muted">{i + 1}</span>
+                    {step.label}
+                  </p>
+                  {step.result && <ResultTable result={step.result} className="mt-1" />}
+                </li>
+              ))}
+            </ol>
+          ) : (
+            card.result && <ResultTable result={card.result} className="mt-3 rounded-2xl bg-surface/70 dark:bg-bg/55" />
+          )}
           {refs.length > 0 && (
             <section aria-label="문법" className="mt-3 rounded-2xl bg-surface/70 px-3.5 py-3 dark:bg-bg/55">
               {refs.map((ref, ri) => (
@@ -402,7 +459,9 @@ export function CardSession({ queue: initial, syntax, dialectFilter, onAnswer, o
                     <b className="text-[14.5px] font-extrabold">{ref.title}</b>
                   </p>
                   <p className="mt-1 text-[12.5px] leading-snug text-muted">{ref.summary}</p>
-                  {formsFor(ref, card.dialect, dialectFilter).map((f, i) => (
+                  <details className="mt-1.5">
+                    <summary className="cursor-pointer text-[12.5px] font-bold text-muted">형태와 예</summary>
+                    {formsFor(ref, card.dialect, dialectFilter).map((f, i) => (
                     <div key={i} className={`grid grid-cols-[80px_1fr] items-baseline gap-x-2 gap-y-0.5 py-1.5 ${i === 0 ? "mt-1" : "border-t border-dashed border-line-2"}`}>
                       <span className={`text-[12.5px] font-bold ${DIALECT_TONE[f.dialect]}`}>{f.dialect === "common" ? "공통" : DIALECT_LABEL[f.dialect]}</span>
                       <code className={`font-mono text-[13px] leading-normal break-words whitespace-pre-wrap text-code-fg ${f.dialect === card.dialect ? "font-bold" : ""}`}>{f.code}</code>
@@ -414,7 +473,8 @@ export function CardSession({ queue: initial, syntax, dialectFilter, onAnswer, o
                         </p>
                       )}
                     </div>
-                  ))}
+                    ))}
+                  </details>
                 </div>
               ))}
             </section>

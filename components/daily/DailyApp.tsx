@@ -91,6 +91,8 @@ export function DailyApp({ decks, syntax, pathSets, skills }: { decks: CardDeck[
         skills={skills}
         now={now}
         onStart={start}
+        dialect={dialect}
+        onDialect={(d) => updateSettings({ dialect: d })}
         onOpenSettings={() => setSettingsOpen(true)}
         gearRef={gearRef}
       />

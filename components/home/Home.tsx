@@ -1,4 +1,7 @@
 "use client";
+import { SegmentedControl } from "@/components/ui-lab/components/segmented-control/SegmentedControl";
+import { DIALECT_LABEL, UI_DIALECTS } from "@/lib/content/types";
+import type { DialectFilter } from "@/lib/daily/srs";
 import Link from "next/link";
 import type { RefObject } from "react";
 import { Selecky } from "@/components/selecky/Selecky";
@@ -31,10 +34,15 @@ export interface HomeProps {
   /** 현재 시각(ms). 정해지지 않았으면 0 */
   now: number;
   onStart: () => void;
+  /** 카드를 어느 엔진 기준으로 낼지 */
+  dialect: DialectFilter;
+  onDialect: (dialect: DialectFilter) => void;
   onOpenSettings: () => void;
   /** 설정 시트를 닫을 때 포커스가 돌아올 톱니 버튼 */
   gearRef: RefObject<HTMLButtonElement | null>;
 }
+
+const DIALECT_OPTIONS: { value: DialectFilter; label: string }[] = [...UI_DIALECTS.map((d) => ({ value: d, label: DIALECT_LABEL[d] })), { value: "all", label: "전체" }];
 
 const greeting = ({ ready, goal, answered, dueCount, freshCount }: HomeProps): string => {
   if (!ready) return " ";
@@ -78,7 +86,7 @@ function ReviewRow({ skill, problem }: { skill: SkillView; problem: SkillProblem
 }
 
 export function Home(props: HomeProps) {
-  const { ready, dateLabel, goal, answered, streak, dueCount, freshCount, masteredCount, week, pathSets, skills, now, onStart, onOpenSettings, gearRef } = props;
+  const { ready, dateLabel, goal, answered, streak, dueCount, freshCount, masteredCount, week, pathSets, skills, now, onStart, dialect, onDialect, onOpenSettings, gearRef } = props;
   const { next } = usePath(pathSets);
   const progress = useProgressStore();
   const reviews = useSkillStore();
@@ -147,6 +155,8 @@ export function Home(props: HomeProps) {
             </Button>
           </div>
         </section>
+
+        <SegmentedControl label="카드 엔진" size="sm" options={DIALECT_OPTIONS} value={dialect} onChange={onDialect} />
 
         {(due.length > 0 || next) && (
           <section aria-label="문제 복습" className="mt-1 lg:mt-0 lg:rounded-[18px] lg:bg-surface lg:p-5 lg:pb-3 lg:shadow-[inset_0_0_0_1.5px_var(--color-line),0_3px_0_var(--color-line)] lg:dark:shadow-[inset_0_0_0_1px_var(--color-line)]">

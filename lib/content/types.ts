@@ -277,6 +277,18 @@ export const CardSchema = z.object({
   syntax: z.array(z.string()).default([]),
   /** 빌드가 answers[0] 을 넣어 실행한 결과로 채운다 */
   result: z.object({ columns: z.array(z.string()), rows: z.array(z.array(CellSchema)) }).optional(),
+  /** 틀린 줄 찾기 카드: 빈칸 자리에 잘못 들어가 있던 글. 있으면 이 글을 넣은 쿼리를 보여 주고 틀린 줄부터 고르게 한다 */
+  bug: z.string().optional(),
+  /** 빌드가 bug 를 넣어 실행한 결과로 채운다 */
+  bugResult: z.object({ columns: z.array(z.string()), rows: z.array(z.array(CellSchema)) }).optional(),
+  /** true 면 기본 학습에서 뺀다(쓸 일이 드물거나 다른 카드와 겹치는 카드) */
+  extra: z.boolean().default(false),
+  /** 정답 낱말의 뜻. "COALESCE: 하나로 합치다" 처럼 영어 뜻과 동작을 잇는 한 줄 */
+  word: z.string().optional(),
+  /** 풀이 뒤에 차례로 보여 줄 중간 과정. 빌드가 sql 을 실행해 result 를 채운다 */
+  steps: z
+    .array(z.object({ label: z.string(), sql: z.string(), result: z.object({ columns: z.array(z.string()), rows: z.array(z.array(CellSchema)) }).optional() }))
+    .optional(),
 });
 export type Card = z.infer<typeof CardSchema>;
 

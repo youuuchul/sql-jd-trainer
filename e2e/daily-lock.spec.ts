@@ -6,7 +6,7 @@ import { maskAnswers } from "../lib/daily/srs";
 import { problem, set } from "./content";
 
 const DIR = "content/cards";
-const cards: Card[] = readdirSync(DIR).flatMap((f) => (JSON.parse(readFileSync(path.join(DIR, f), "utf-8")) as { cards: Card[] }).cards);
+const cards: Card[] = readdirSync(DIR).flatMap((f) => (JSON.parse(readFileSync(path.join(DIR, f), "utf-8")) as { cards: Card[] }).cards).filter((c) => !c.extra);
 const DIALECT_TEXT = { common: "공통", postgres: "PostgreSQL", bigquery: "BigQuery", mysql: "MySQL" };
 /** 같은 문장 카드가 방언·수준만 달라 둘 이상 있다. 화면 카드 윗줄의 방언 라벨과 응용 표시로 정확히 고른다 */
 const shownCard = async (page: Page): Promise<Card> => {
@@ -14,6 +14,9 @@ const shownCard = async (page: Page): Promise<Card> => {
   const row = await page.locator("article > div").first().innerText();
   const found = cards.filter((c) => c.prompt === prompt && row.includes(DIALECT_TEXT[c.dialect]) && row.includes("응용") === (c.level === "applied"));
   expect(found, "화면의 카드가 덱에 하나만 있어야 한다").toHaveLength(1);
+  // 틀린 줄 찾기 카드는 틀린 줄을 먼저 골라야 빈칸이 열린다
+  const bugLine = page.locator(`article [data-line="${found[0].template.split("\n").findIndex((l) => l.includes("___"))}"]`);
+  if (found[0].bug !== undefined && (await bugLine.count())) await bugLine.click();
   return found[0];
 };
 const storedCard = (page: Page, id: string) => page.evaluate((cardId) => (JSON.parse(localStorage.getItem("sjt:daily:v1") ?? "{}") as { cards?: Record<string, { box: number; lapses: number }> }).cards?.[cardId], id);
@@ -31,6 +34,9 @@ const seedDue = (page: Page, ids: string[]) =>
 const openHints = async (page: Page, card: Card) => {
   await page.getByRole("button", { name: "힌트" }).click();
   await expect(page.getByText(card.hint)).toBeVisible();
+  if (card.hintMore) await expect(page.getByText(card.hintMore)).toHaveCount(0);
+  await page.getByRole("button", { name: "힌트 더" }).click();
+  if (card.hintMore) await expect(page.getByText(card.hintMore)).toBeVisible();
   await expect(page.locator("article [data-first-letter]")).toHaveCount(0);
   if (card.answers[0].length >= 3) {
     await page.getByRole("button", { name: "첫 글자" }).click();
@@ -175,15 +181,15 @@ test.describe("하루 카드 (모바일)", () => {
     await expect(page.getByRole("button", { name: "5장 더 풀기" })).toBeVisible();
   });
 
-  test("힌트는 뜻(말 설명·함수 뜻) → 첫 글자 → 정답 보기 순이고, 정답이 짧으면 첫 글자를 건너뛴다", async ({ page }) => {
-    const short = byId("c-agg-count-star");
-    const long = byId("c-agg-count-distinct");
+  test("힌트는 짧은 힌트 → 추가 설명 → 첫 글자 → 정답 보기 순이고, 정답이 짧으면 첫 글자를 건너뛴다", async ({ page }) => {
+    const short = byId("c-num-round");
+    const long = byId("c-null-coalesce");
     await seedDue(page, [short.id, long.id]);
     await page.goto("/");
     await page.addStyleTag({ content: "nextjs-portal { display: none !important; }" });
     await page.getByRole("button", { name: "시작하기" }).click();
 
-    // 정답 '*' 은 첫 글자가 곧 정답이라 뜻 힌트 다음이 바로 정답 보기
+    // 정답이 한 글자면 첫 글자가 곧 정답이라 추가 설명 다음이 바로 정답 보기
     expect((await shownCard(page)).id).toBe(short.id);
     await openHints(page, short);
     await expect(page.getByRole("button", { name: "정답 보기" })).toBeVisible();
@@ -192,7 +198,7 @@ test.describe("하루 카드 (모바일)", () => {
     await expect(page.getByText("힌트를 쓴 정답")).toBeVisible();
     await page.getByRole("button", { name: "계속" }).click();
 
-    // 정답 DISTINCT: 뜻 힌트(카드의 추가 설명, 없으면 정답을 ___ 로 가린 문법 뜻) → 첫 글자 D → 정답 보기
+    // 긴 정답: 짧은 힌트 → 추가 설명(없으면 정답을 ___ 로 가린 문법 뜻) → 첫 글자 → 정답 보기
     expect((await shownCard(page)).id).toBe(long.id);
     await expect(page.getByRole("button", { name: "정답 보기" })).toHaveCount(0);
     await openHints(page, long);
@@ -205,8 +211,29 @@ test.describe("하루 카드 (모바일)", () => {
     await expect(page.getByText("오답", { exact: true })).toBeVisible();
   });
 
+  test("틀린 줄 찾기: 맞는 줄을 고르면 오답으로 세고, 틀린 줄을 고르면 빈칸이 열려 고친 뒤 중간 과정을 본다", async ({ page }) => {
+    const card = byId("c-join-left");
+    const bug = card.template.split("\n").findIndex((l) => l.includes("___"));
+    await seedDue(page, [card.id]);
+    await page.goto("/");
+    await page.addStyleTag({ content: "nextjs-portal { display: none !important; }" });
+    await page.getByRole("button", { name: "시작하기" }).click();
+
+    await expect(page.locator("article h2")).toHaveText(card.prompt);
+    await expect(page.getByLabel("빈칸")).toHaveCount(0);
+    await expect(page.getByRole("region", { name: "지금 결과" })).toBeVisible();
+    await page.locator(`article [data-line="${bug === 0 ? 1 : 0}"]`).click();
+    await expect(page.locator("article").getByRole("alert")).toContainText("문제가 없어요");
+
+    await page.locator(`article [data-line="${bug}"]`).click();
+    await page.getByLabel("빈칸").fill(card.answers[0]);
+    await page.getByLabel("빈칸").press("Enter");
+    await expect(page.getByText("처음 단계로 돌아갑니다")).toBeVisible();
+    await expect(page.getByRole("list", { name: "중간 과정" }).getByRole("listitem")).toHaveCount(card.steps!.length);
+  });
+
   test("오답을 낸 카드에서 그만하면 틀린 카드로 기록하고, 오답 없이 그만하면 기록하지 않는다", async ({ page }) => {
-    const [a, b] = [byId("c-agg-count-star"), byId("c-agg-count-distinct")];
+    const [a, b] = [byId("c-num-round"), byId("c-null-coalesce")];
     await seedDue(page, [a.id, b.id]);
     await page.goto("/");
     await page.addStyleTag({ content: "nextjs-portal { display: none !important; }" });

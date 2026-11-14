@@ -139,7 +139,7 @@ export const intervalLabel = (box: number): string => {
 };
 
 /** 화면에 내지 않는 방언(MySQL)의 카드는 출제·집계에서 뺀다. 콘텐츠와 저장값은 그대로 둔다 */
-export const isShown = (card: Pick<Card, "dialect">): boolean => card.dialect === "common" || UI_DIALECTS.includes(card.dialect);
+export const isShown = (card: Pick<Card, "dialect" | "extra">): boolean => !card.extra && (card.dialect === "common" || UI_DIALECTS.includes(card.dialect));
 
 const editDistance = (a: string, b: string): number => {
   let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
