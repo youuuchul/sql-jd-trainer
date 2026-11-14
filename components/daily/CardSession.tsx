@@ -451,6 +451,12 @@ export function CardSession({ queue: initial, syntax, dialectFilter, onAnswer, o
           <div className="my-3.5">
             <ReviewLadder box={finish.box} tone={passTone ? "pass" : "fail"} />
           </div>
+          <section aria-label="문제" className="mb-3 rounded-2xl bg-surface/70 px-3.5 py-3 dark:bg-bg/55">
+            <p className="text-[13.5px] leading-snug font-bold">{card.prompt}</p>
+            <div className="mt-2 rounded-xl bg-code-bg px-2.5 py-2 shadow-[inset_0_0_0_1px_var(--color-line)] [&>div]:text-[12.5px] [&>div]:leading-[1.6]">
+              <CardCode template={card.template} blank={<b className="rounded bg-pass-soft px-1 text-pass-ink">{answer}</b>} />
+            </div>
+          </section>
           <Note>
             {card.word && <b className="mb-1 block">{card.word}</b>}
             {card.explanation}
