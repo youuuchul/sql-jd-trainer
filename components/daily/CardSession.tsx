@@ -7,7 +7,7 @@ import { Icon } from "@/components/ui/icons";
 import { Note } from "@/components/ui/Note";
 import { ResultSheet } from "@/components/ui/ResultSheet";
 import { useHideTabBar } from "@/components/shell/tabbar";
-import { DIALECT_LABEL, type Card, type SyntaxRef } from "@/lib/content/types";
+import { DIALECT_LABEL, UI_DIALECTS, type Card, type SyntaxRef } from "@/lib/content/types";
 import { answerDistance, FIRST_LETTER_MIN_LEN, intervalLabel, isCorrect, MASTERED_BOX, maskAnswers, schedule, type CardState, type DialectFilter, type Outcome } from "@/lib/daily/srs";
 import { Blank, CardCode } from "./CardCode";
 import { ReviewLadder } from "./ReviewLadder";
@@ -55,17 +55,68 @@ const DIALECT_TONE: Record<string, string> = {
   common: "text-muted",
 };
 
-/** 카드 방언 형태를 먼저, 다음 공통, 나머지 방언 순. MySQL 형식은 화면에 내지 않는다 */
+/** 카드 방언 형태를 먼저, 다음 공통, 나머지 방언 순 */
 const formsFor = (ref: SyntaxRef, cardDialect: Card["dialect"], filter: DialectFilter) => {
   const rank = (d: string) => (d === cardDialect ? 0 : d === "common" ? 1 : 2);
   return ref.forms
-    .filter((f) => f.dialect !== "mysql" && (filter === "all" || f.dialect === "common" || f.dialect === filter || f.dialect === cardDialect))
+    .filter((f) => (f.dialect === "common" || UI_DIALECTS.includes(f.dialect)) && (filter === "all" || f.dialect === "common" || f.dialect === filter || f.dialect === cardDialect))
     .sort((a, b) => rank(a.dialect) - rank(b.dialect));
 };
 
 const CARD_NORMAL = "bg-surface shadow-[inset_0_0_0_1.5px_var(--color-line),0_4px_0_var(--color-line)] dark:shadow-[inset_0_0_0_1px_var(--color-line)]";
 const CARD_WRONG =
   "bg-fail-soft shadow-[inset_0_0_0_1.5px_color-mix(in_srgb,var(--color-fail)_40%,transparent),0_4px_0_color-mix(in_srgb,var(--color-fail)_25%,transparent)] dark:shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--color-fail)_45%,transparent)]";
+
+/** 빈칸을 채웠을 때 나오는 실행 결과 */
+function ResultTable({ result, className }: { result: NonNullable<Card["result"]>; className: string }) {
+  return (
+    <div className={`overflow-x-auto ${className}`}>
+      <table className="w-full font-mono text-[12px]">
+        <thead className="text-muted">
+          <tr>
+            {result.columns.map((c) => (
+              <th key={c} className="px-2.5 py-1.5 text-left font-medium">
+                {c}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {result.rows.map((r, i) => (
+            <tr key={i} className="border-t border-line">
+              {r.map((v, j) => (
+                <td key={j} className="px-2.5 py-1.5 whitespace-nowrap">
+                  {v === null ? <span className="text-muted">NULL</span> : String(v)}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/** 화면 키보드가 가린 높이(px). 키보드가 없으면 0 */
+const useKeyboardInset = (): number => {
+  const [inset, setInset] = useState(0);
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const update = () => {
+      const hidden = window.innerHeight - vv.height - vv.offsetTop;
+      setInset(hidden > 80 ? Math.round(hidden) : 0);
+    };
+    update();
+    vv.addEventListener("resize", update);
+    vv.addEventListener("scroll", update);
+    return () => {
+      vv.removeEventListener("resize", update);
+      vv.removeEventListener("scroll", update);
+    };
+  }, []);
+  return inset;
+};
 
 export function CardSession({ queue: initial, syntax, dialectFilter, onAnswer, onExit }: Props) {
   useHideTabBar();
@@ -84,6 +135,7 @@ export function CardSession({ queue: initial, syntax, dialectFilter, onAnswer, o
   const states = useRef(new Map<string, CardState | undefined>());
   const inputRef = useRef<HTMLInputElement>(null);
   const actionRef = useRef<HTMLSpanElement>(null);
+  const keyboard = useKeyboardInset();
 
   const card = queue[pos];
   const isRetry = card ? queue.findIndex((c) => c.id === card.id) < pos : false;
@@ -197,7 +249,7 @@ export function CardSession({ queue: initial, syntax, dialectFilter, onAnswer, o
             : "";
 
   return (
-    <div className="mx-auto flex w-full max-w-lg flex-1 flex-col px-4 pt-3 pb-6 lg:pt-8">
+    <div className="mx-auto flex w-full max-w-lg flex-1 flex-col px-4 pt-3 pb-6 lg:pt-8" style={keyboard > 0 && !finish ? { paddingBottom: keyboard + 76 } : undefined}>
       <div className="flex h-14 items-center gap-3.5 lg:h-12">
         <button type="button" onClick={leave} aria-label="그만하기" className="-ml-1 inline-flex h-10 w-10 items-center justify-center rounded-xl text-muted hover:bg-surface-2 hover:text-fg">
           <Icon name="x" size={26} />
@@ -270,6 +322,12 @@ export function CardSession({ queue: initial, syntax, dialectFilter, onAnswer, o
             />
           )}
         </div>
+        {card.result && !finish && (
+          <section aria-label="실행 결과" className="mt-2.5">
+            <p className="mx-0.5 mb-1 text-[12.5px] font-bold text-muted">실행 결과</p>
+            <ResultTable result={card.result} className="rounded-[14px] shadow-[inset_0_0_0_1px_var(--color-line)]" />
+          </section>
+        )}
         {marked && lastWrong && (
           <p role="alert" className="mx-0.5 mt-3 flex items-center gap-1.5 text-[13.5px] font-semibold text-fail-ink">
             <Icon name="xcircle" size={17} className="shrink-0 text-fail" />
@@ -285,7 +343,10 @@ export function CardSession({ queue: initial, syntax, dialectFilter, onAnswer, o
       </article>
 
       {!finish && (
-        <div className="mt-auto flex gap-2 pt-6">
+        <div
+          className={keyboard > 0 ? "fixed inset-x-0 z-30 mx-auto flex w-full max-w-lg gap-2 bg-bg px-4 py-2.5 shadow-[0_-1px_0_var(--color-line)]" : "mt-auto flex gap-2 pt-6"}
+          style={keyboard > 0 ? { bottom: keyboard } : undefined}
+        >
           {hintStep === 2 ? (
             <Button tone="ghost" size="sm" onClick={() => complete("wrong", true)}>
               정답 보기
@@ -335,32 +396,7 @@ export function CardSession({ queue: initial, syntax, dialectFilter, onAnswer, o
             <ReviewLadder box={finish.box} tone={passTone ? "pass" : "fail"} />
           </div>
           <Note>{card.explanation}</Note>
-          {card.result && (
-            <div className="mt-3 overflow-x-auto rounded-2xl bg-surface/70 dark:bg-bg/55">
-              <table className="w-full font-mono text-[12px]">
-                <thead className="text-muted">
-                  <tr>
-                    {card.result.columns.map((c) => (
-                      <th key={c} className="px-2.5 py-1.5 text-left font-medium">
-                        {c}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {card.result.rows.map((r, i) => (
-                    <tr key={i} className="border-t border-line">
-                      {r.map((v, j) => (
-                        <td key={j} className="px-2.5 py-1.5 whitespace-nowrap">
-                          {v === null ? <span className="text-muted">NULL</span> : String(v)}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+          {card.result && <ResultTable result={card.result} className="mt-3 rounded-2xl bg-surface/70 dark:bg-bg/55" />}
           {refs.length > 0 && (
             <section aria-label="문법" className="mt-3 rounded-2xl bg-surface/70 px-3.5 py-3 dark:bg-bg/55">
               {refs.map((ref, ri) => (

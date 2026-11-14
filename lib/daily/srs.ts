@@ -1,4 +1,4 @@
-import type { Card, Dialect } from "@/lib/content/types";
+import { UI_DIALECTS, type Card, type Dialect } from "@/lib/content/types";
 
 /** 상자별 다음 복습까지 간격(분). 0번 상자는 틀린 카드로 5분 뒤 다시 나온다. */
 export const BOX_INTERVAL_MIN = [5, 60 * 24, 60 * 24 * 3, 60 * 24 * 7, 60 * 24 * 14, 60 * 24 * 30] as const;
@@ -139,7 +139,7 @@ export const intervalLabel = (box: number): string => {
 };
 
 /** 화면에 내지 않는 방언(MySQL)의 카드는 출제·집계에서 뺀다. 콘텐츠와 저장값은 그대로 둔다 */
-export const isShown = (card: Pick<Card, "dialect">): boolean => card.dialect !== "mysql";
+export const isShown = (card: Pick<Card, "dialect">): boolean => card.dialect === "common" || UI_DIALECTS.includes(card.dialect);
 
 const editDistance = (a: string, b: string): number => {
   let prev = Array.from({ length: b.length + 1 }, (_, j) => j);

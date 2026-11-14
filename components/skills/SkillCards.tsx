@@ -25,8 +25,7 @@ export function SkillCards(props: Props) {
 function Session({ skillId, cards, syntax, now }: Props & { now: number }) {
   const router = useRouter();
   const { store, record } = useDailyStore();
-  const setting: DialectFilter = store.settings.dialect === "mysql" ? "all" : store.settings.dialect;
-  const dialect: DialectFilter = cards.some((c) => matchesDialect(c, setting)) ? setting : "all";
+  const dialect: DialectFilter = cards.some((c) => matchesDialect(c, store.settings.dialect)) ? store.settings.dialect : "all";
   const [queue] = useState<SessionCard[]>(() => {
     const first = buildQueue(cards, store.cards, { now, size: cards.length, filter: dialect, seedText: skillId });
     const picked = new Set(first.map((c) => c.id));

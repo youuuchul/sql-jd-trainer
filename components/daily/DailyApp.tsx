@@ -5,7 +5,7 @@ import type { SkillView } from "@/lib/skills";
 import { SettingsSheet } from "@/components/home/SettingsSheet";
 import type { PathSet } from "@/lib/path";
 import type { CardDeck, SyntaxRef } from "@/lib/content/types";
-import { buildQueue, dayKey, isShown, MASTERED_BOX, matchesDialect, streak, weekOf, type DialectFilter } from "@/lib/daily/srs";
+import { buildQueue, dayKey, isShown, MASTERED_BOX, matchesDialect, streak, weekOf } from "@/lib/daily/srs";
 import { useDailyStore, useNow } from "@/lib/daily/store";
 import { CardSession, type SessionCard, type SessionResult } from "./CardSession";
 import { StreakScreen } from "./StreakScreen";
@@ -21,7 +21,7 @@ export function DailyApp({ decks, syntax, pathSets, skills }: { decks: CardDeck[
   const gearRef = useRef<HTMLButtonElement>(null);
   const [now, refreshNow] = useNow();
   const { goal } = store.settings;
-  const dialect: DialectFilter = store.settings.dialect === "mysql" ? "all" : store.settings.dialect;
+  const { dialect } = store.settings;
 
   const cards = useMemo(() => decks.flatMap((d) => d.cards.filter(isShown).map((c) => ({ ...c, deckTitle: d.title }))), [decks]);
   const syntaxById = useMemo(() => Object.fromEntries(syntax.map((s) => [s.id, s])), [syntax]);
