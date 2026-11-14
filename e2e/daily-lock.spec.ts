@@ -30,14 +30,14 @@ const seedDue = (page: Page, ids: string[]) =>
 /** 힌트 단계: 정답이 3글자 이상이면 앞글자 → 추가 힌트, 짧으면 바로 추가 힌트 */
 const openHints = async (page: Page, card: Card) => {
   await page.getByRole("button", { name: "힌트" }).click();
-  if (card.answers[0].length >= 3) {
-    await expect(page.locator("article [data-first-letter]")).toHaveText(card.answers[0][0]);
-    await expect(page.getByText(card.hint)).toHaveCount(0);
-    await page.getByRole("button", { name: "추가 힌트" }).click();
-  } else {
-    await expect(page.locator("article [data-first-letter]")).toHaveCount(0);
-  }
   await expect(page.getByText(card.hint)).toBeVisible();
+  await expect(page.locator("article [data-first-letter]")).toHaveCount(0);
+  if (card.answers[0].length >= 3) {
+    await page.getByRole("button", { name: "첫 글자" }).click();
+    await expect(page.locator("article [data-first-letter]")).toHaveText(card.answers[0][0]);
+  } else {
+    await expect(page.getByRole("button", { name: "첫 글자" })).toHaveCount(0);
+  }
 };
 const setGoal = async (page: Page, goal: string) => {
   await page.getByRole("button", { name: "설정" }).click();
@@ -175,7 +175,7 @@ test.describe("하루 카드 (모바일)", () => {
     await expect(page.getByRole("button", { name: "5장 더 풀기" })).toBeVisible();
   });
 
-  test("힌트는 앞글자 → 추가 힌트(말 설명·함수 뜻) → 정답 보기 순이고, 정답이 짧으면 앞글자를 건너뛴다", async ({ page }) => {
+  test("힌트는 뜻(말 설명·함수 뜻) → 첫 글자 → 정답 보기 순이고, 정답이 짧으면 첫 글자를 건너뛴다", async ({ page }) => {
     const short = byId("c-agg-count-star");
     const long = byId("c-agg-count-distinct");
     await seedDue(page, [short.id, long.id]);
@@ -183,7 +183,7 @@ test.describe("하루 카드 (모바일)", () => {
     await page.addStyleTag({ content: "nextjs-portal { display: none !important; }" });
     await page.getByRole("button", { name: "시작하기" }).click();
 
-    // 정답 '*' 은 앞글자가 곧 정답이라 바로 추가 힌트
+    // 정답 '*' 은 첫 글자가 곧 정답이라 뜻 힌트 다음이 바로 정답 보기
     expect((await shownCard(page)).id).toBe(short.id);
     await openHints(page, short);
     await expect(page.getByRole("button", { name: "정답 보기" })).toBeVisible();
@@ -192,15 +192,15 @@ test.describe("하루 카드 (모바일)", () => {
     await expect(page.getByText("힌트를 쓴 정답")).toBeVisible();
     await page.getByRole("button", { name: "계속" }).click();
 
-    // 정답 DISTINCT: 앞글자 D → 추가 힌트에 함수 뜻, 정답은 ___ 로 가려진다 → 정답 보기
+    // 정답 DISTINCT: 뜻 힌트(카드의 추가 설명, 없으면 정답을 ___ 로 가린 문법 뜻) → 첫 글자 D → 정답 보기
     expect((await shownCard(page)).id).toBe(long.id);
     await expect(page.getByRole("button", { name: "정답 보기" })).toHaveCount(0);
     await openHints(page, long);
     const hintBox = page.locator("article").getByText(long.hint).locator("xpath=ancestor::div[1]");
     await expect(hintBox).toContainText("첫 글자");
-    for (const id of long.syntax) await expect(hintBox).toContainText(maskAnswers(syntaxSummary.get(id)!.summary, long.answers));
+    if (long.hintMore) await expect(hintBox).toContainText(long.hintMore);
+    else for (const id of long.syntax) await expect(hintBox).toContainText(maskAnswers(syntaxSummary.get(id)!.summary, long.answers));
     await expect(hintBox).not.toContainText(new RegExp(`\\b${long.answers[0]}\\b`, "i"));
-    await expect(hintBox).toContainText("___");
     await page.getByRole("button", { name: "정답 보기" }).click();
     await expect(page.getByText("오답", { exact: true })).toBeVisible();
   });

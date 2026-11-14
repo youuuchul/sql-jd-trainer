@@ -56,7 +56,10 @@
 - [x] 빈칸 품질 재점검(37문제 수정·추가). jb-hr-02, jb-scm-01 은 같은 식이 두 번 나와 핵심 CASE 대신 주변 조건을 가린다
 - [x] 얇은 유형 1차 보강 16문제(퍼널·코호트·연속 구간·기간 겹침·누적·NTILE·문자열 합치기·EXISTS)
 - [x] 얇은 유형 2차 보강 20문제(문자열 합치기 4, NTILE 3, 연속 구간 3, 다단계 CTE 5, 날짜 뼈대 2, LAG·LEAD 3)
-- [ ] 유형 사전 경계 정리: b-date 와 f-date-*, b-number 와 f-round·f-cast, b-set 과 f-union, f-lag-lead 와 p-prev-compare 가 겹친다. 파이프라인·구간표 조인·기준일 스냅샷은 맞는 유형이 없다
+- [x] 유형 사전 경계 정리(2026-11-14, 47 → 41개: 패턴 16·함수 13·기초 문법 12): f-union → b-set, f-cast·f-round → b-number, f-coalesce·f-nullif → b-null, f-substr → b-string, f-row-number → p-top-n, b-date 는 '날짜 범위 조건'으로 좁힘, f-window-frame 은 '집계 윈도우', 파이프라인 유형 신설. 없어진 유형의 복습 기록은 합쳐진 유형으로 옮긴다
+- [ ] 구간표 조인·기준일 스냅샷은 아직 맞는 유형이 없다
+- [x] 코테 회고 세트(앱 서비스 로그 스키마, 12문제), 카드 17장 추가, 카드에 MySQL 방언 노출
+- [x] 카드 문구 개편(상황 + 빈칸이 묻는 것), 전 카드 추가 힌트, 힌트 순서 뜻 → 첫 글자 → 정답 보기, 풀이 전 실행 결과, 문법 사전 예시
 - [ ] BigQuery 변환 계층에 GENERATE_DATE_ARRAY·UNNEST 지원(지금 날짜 뼈대 정답은 WITH RECURSIVE)
 - [ ] 오늘 탭 데일리 팁: 오래 안 푼 함수, 자주 틀린 오답 유형, 한 번도 안 푼 유형
 - [x] 유형 상세에서 그 유형의 카드만 바로 풀기(/skills/<id>/cards)

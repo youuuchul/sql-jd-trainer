@@ -299,6 +299,8 @@ export const SyntaxRefSchema = z.object({
         dialect: z.enum(["common", ...DIALECTS]),
         code: z.string(),
         note: z.string().optional(),
+        /** 값을 넣은 짧은 사용 예와 결과. "식 → 결과" 한 줄 */
+        example: z.string().optional(),
       }),
     )
     .min(1),

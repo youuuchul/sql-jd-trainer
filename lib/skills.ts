@@ -63,11 +63,34 @@ const listeners = new Set<() => void>();
 let cache: Store | null = null;
 const EMPTY: Store = {};
 
+/** 다른 유형에 합쳐져 없어진 유형. 쌓인 복습 상태는 합쳐진 유형에 기록이 없을 때 그리로 옮긴다 */
+const MERGED: Record<string, string> = {
+  "f-union": "b-set",
+  "f-cast": "b-number",
+  "f-round": "b-number",
+  "f-coalesce": "b-null",
+  "f-nullif": "b-null",
+  "f-substr": "b-string",
+  "f-row-number": "p-top-n",
+};
+
+const migrate = (store: Store): Store => {
+  let out = store;
+  for (const [from, to] of Object.entries(MERGED)) {
+    if (!out[from]) continue;
+    const { [from]: old, ...rest } = out;
+    out = rest[to] ? rest : { ...rest, [to]: old };
+  }
+  return out;
+};
+
 const read = (): Store => {
   if (cache) return cache;
   if (typeof window === "undefined") return EMPTY;
   try {
-    cache = JSON.parse(window.localStorage.getItem(KEY) ?? "{}") as Store;
+    const saved = JSON.parse(window.localStorage.getItem(KEY) ?? "{}") as Store;
+    cache = migrate(saved);
+    if (cache !== saved) window.localStorage.setItem(KEY, JSON.stringify(cache));
   } catch {
     cache = {};
   }

@@ -123,7 +123,7 @@ export function CardSession({ queue: initial, syntax, dialectFilter, onAnswer, o
   const [queue, setQueue] = useState(initial);
   const [pos, setPos] = useState(0);
   const [input, setInput] = useState("");
-  /** 0 없음, 1 앞글자, 2 추가 힌트(말 설명·함수 뜻). 정답이 짧으면 앞글자를 건너뛴다 */
+  /** 0 없음, 1 뜻 힌트(말 설명·함수 뜻), 2 첫 글자. 정답이 짧으면 첫 글자를 건너뛴다 */
   const [hintStep, setHintStep] = useState<0 | 1 | 2>(0);
   const [focused, setFocused] = useState(false);
   /** 지금 입력이 오답으로 표시된 상태. 입력을 고치면 풀린다 */
@@ -277,24 +277,20 @@ export function CardSession({ queue: initial, syntax, dialectFilter, onAnswer, o
           <Note className="mb-3 flex gap-2 !py-2.5 text-[13.5px]">
             <Icon name="bulb" size={16} className="mt-0.5 shrink-0" />
             <div className="min-w-0">
-              {canFirstLetter && (
-                <p>
-                  첫 글자 <b data-first-letter="" className="font-mono">{answer[0]}</b>
-                </p>
+              <p>{card.hint}</p>
+              {card.hintMore ? (
+                <p className="mt-1.5">{card.hintMore}</p>
+              ) : (
+                refs.map((ref) => (
+                  <p key={ref.id} className="mt-1.5 text-[13px] leading-snug">
+                    <b>{maskAnswers(ref.title, card.answers)}</b> {maskAnswers(ref.summary, card.answers)}
+                  </p>
+                ))
               )}
               {hintStep === 2 && (
-                <>
-                  <p className={canFirstLetter ? "mt-1.5" : ""}>{card.hint}</p>
-                  {card.hintMore ? (
-                    <p className="mt-1.5">{card.hintMore}</p>
-                  ) : (
-                    refs.map((ref) => (
-                      <p key={ref.id} className="mt-1.5 text-[13px] leading-snug">
-                        <b>{maskAnswers(ref.title, card.answers)}</b> {maskAnswers(ref.summary, card.answers)}
-                      </p>
-                    ))
-                  )}
-                </>
+                <p className="mt-1.5">
+                  첫 글자 <b data-first-letter="" className="font-mono">{answer[0]}</b>
+                </p>
               )}
             </div>
           </Note>
@@ -347,17 +343,17 @@ export function CardSession({ queue: initial, syntax, dialectFilter, onAnswer, o
           className={keyboard > 0 ? "fixed inset-x-0 z-30 mx-auto flex w-full max-w-lg gap-2 bg-bg px-4 py-2.5 shadow-[0_-1px_0_var(--color-line)]" : "mt-auto flex gap-2 pt-6"}
           style={keyboard > 0 ? { bottom: keyboard } : undefined}
         >
-          {hintStep === 2 ? (
+          {hintStep === 2 || (hintStep === 1 && !canFirstLetter) ? (
             <Button tone="ghost" size="sm" onClick={() => complete("wrong", true)}>
               정답 보기
             </Button>
           ) : hintStep === 1 ? (
             <Button tone="ghost" size="sm" onClick={() => setHintStep(2)}>
               <Icon name="bulb" size={18} />
-              추가 힌트
+              첫 글자
             </Button>
           ) : (
-            <Button tone="ghost" size="sm" onClick={() => setHintStep(canFirstLetter ? 1 : 2)}>
+            <Button tone="ghost" size="sm" onClick={() => setHintStep(1)}>
               <Icon name="bulb" size={18} />
               힌트
             </Button>
@@ -411,6 +407,12 @@ export function CardSession({ queue: initial, syntax, dialectFilter, onAnswer, o
                       <span className={`text-[12.5px] font-bold ${DIALECT_TONE[f.dialect]}`}>{f.dialect === "common" ? "공통" : DIALECT_LABEL[f.dialect]}</span>
                       <code className={`font-mono text-[13px] leading-normal break-words whitespace-pre-wrap text-code-fg ${f.dialect === card.dialect ? "font-bold" : ""}`}>{f.code}</code>
                       {f.note && <p className="col-start-2 text-xs leading-snug font-medium text-muted">{f.note}</p>}
+                      {f.example && (
+                        <p className="col-start-2 font-mono text-xs leading-snug break-words whitespace-pre-wrap text-muted">
+                          <span className="mr-1.5 font-sans font-bold">예</span>
+                          {f.example}
+                        </p>
+                      )}
                     </div>
                   ))}
                 </div>
